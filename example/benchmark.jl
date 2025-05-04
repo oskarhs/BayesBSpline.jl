@@ -17,7 +17,9 @@ function plot_density_estimate()
         """
     )
     K = 40
-    @time f = fit(CubicSplineDensity, x, K)
+    @btime f = fit(CubicSplineDensity, $x, $K)
+    f = fit(CubicSplineDensity, x, K)
+
     t = LinRange(0.0, 1.0, 1001)
     p = plot(t, f.(t), ylims=[0.0, Inf], label="f", xlabel="x", ylabel="Density", color="red", lwd=2.5)
     plot!(p, t, pdf.(d, t), label="f₀", ls=:dash, color="blue", lwd=2.5)

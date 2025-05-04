@@ -16,10 +16,10 @@ julia> f(0.5)
 ```
 """
 struct CubicSplineDensity
-    K::Int # number of splines in basis, need at least K = 4
-    _θ::AbstractMatrix{<:Real} # K×(K-3) matrix of coefficients for the normalized b-splines
-    _weights::AbstractVector{<:Real} # Array specifying p_k ∝ exp(IC(k))
-    _norm_fac::AbstractMatrix{<:Real} # K×(K-3) matrix of normalization factors
+    K::Int
+    _θ::AbstractMatrix{<:Real}
+    _weights::AbstractVector{<:Real}
+    _norm_fac::AbstractMatrix{<:Real}
 
     function CubicSplineDensity(K::Int)
         _θ = Matrix{Float64}(undef, K, K-3)
@@ -62,7 +62,7 @@ function eval_density(f::CubicSplineDensity, x::Real)
         i, bs = b(x)
         @inbounds for j in eachindex(bs)
             l = i-j+1
-            val_k += bs[j] * f._θ[l,k-3]*f._norm_fac[l,k-3] # Recall that Julia stores in column-major format (add inbounds later)
+            val_k += bs[j] * f._θ[l,k-3]*f._norm_fac[l,k-3] # Recall that Julia stores in column-major format
         end
         @inbounds val += val_k*f._weights[k-3]
     end

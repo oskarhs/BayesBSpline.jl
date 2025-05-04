@@ -1,7 +1,7 @@
 """
     fit(CubicSplineDensity, x::AbstractVector{<:Real}, K::Int; binning::Bool=true, nbins::Int=500, maxiter::Int=50, tol::Real=1e-4)
 
-Fit a `CubicSplineDensity` with a given maximal basis dimension to data using the EM algorithm.
+Fits a `CubicSplineDensity` with a given maximal basis dimension to data using the EM algorithm.
 
 Provides a binned implementation suitable for larger data sets.
 
@@ -25,7 +25,7 @@ julia> f(0.5)
 ```
 """
 function StatsAPI.fit(::Type{CubicSplineDensity}, x::AbstractVector{<:Real}, K::Int;
-                        binning::Bool=true, nbins::Int=500, maxiter::Int=50, tol::Real=1e-4)
+                        binning::Bool=true, nbins::Int=500, maxiter::Int=100, tol::Real=1e-3)
     f = CubicSplineDensity(K)
     if length(x) ≤ 1000 || binning==false
         _fit!(f, x, maxiter, tol)
@@ -35,17 +35,17 @@ function StatsAPI.fit(::Type{CubicSplineDensity}, x::AbstractVector{<:Real}, K::
     return f
 end
 
-function _fit!(f::CubicSplineDensity, x::AbstractVector{<:Real}, maxiter::Int=50, tol::Real=1e-4)
+function _fit!(f::CubicSplineDensity, x::AbstractVector{<:Real}, maxiter::Int=50, tol::Real=1e-3)
     n = length(x)
-    _weights = Array{Float64}(undef, f.K-3)
-    for k = 4:f.K
+    _weights = Vector{Float64}(undef, f.K-3)
+    Threads.@threads for k = 4:f.K
         b = BSplineBasis(BSplineOrder(4), LinRange(0.0, 1.0, k-2)) # K-dimensional thingy means we use k-2 knots for cubic splines
-        θ_new = Array{Float64}(undef, k)
+        θ_new = Vector{Float64}(undef, k)
         @inbounds θ_old = f._θ[1:k, k-3]
         for l = 1:maxiter
             θ_new = fill!(θ_new, 0.0)
             for i = 1:n
-                @inbounds j, bs = b(x[i])
+                @inbounds j, bs = evaluate_all(b, x[i])
                 @inbounds denominator = n*dot(@views(θ_old[j:-1:j-3]) .* @views(f._norm_fac[j:-1:j-3,k-3]), bs)
                 @simd for m in eachindex(bs)
                     r = j-m+1
@@ -67,14 +67,14 @@ function _fit!(f::CubicSplineDensity, x::AbstractVector{<:Real}, maxiter::Int=50
     @inbounds f._weights[1:f.K-3] .= _weights / sum(_weights)
 end
 
-function _fit_binned!(f::CubicSplineDensity, x::AbstractVector{<:Real}, nbins::Int, maxiter::Int=50, tol::Real=1e-4)
+function _fit_binned!(f::CubicSplineDensity, x::AbstractVector{<:Real}, nbins::Int, maxiter::Int=50, tol::Real=1e-3)
     N = bin_regular(x, 0.0, 1.0, nbins, true)
     mids = LinRange(0.5/nbins, 1.0-0.5/nbins, nbins)
     n = length(x)
-    _weights = Array{Float64}(undef, f.K-3)
-    for k = 4:f.K
+    _weights = Vector{Float64}(undef, f.K-3)
+    Threads.@threads for k = 4:f.K
         b = BSplineBasis(BSplineOrder(4), LinRange(0.0, 1.0, k-2)) # K-dimensional thingy means we use k-2 knots for cubic splines
-        θ_new = Array{Float64}(undef, k)
+        θ_new = Vector{Float64}(undef, k)
         @inbounds θ_old = f._θ[1:k, k-3]
         for l = 1:maxiter
             θ_new = fill!(θ_new, 0.0)

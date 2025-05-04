@@ -1,8 +1,8 @@
 struct CubicSplineDist <: ContinuousUnivariateDistribution
-    K::Int # number of splines in basis, need at least K = 4
-    a_mat::AbstractMatrix{<:Real} # K×(K-3) matrix of coefficients for the normalized b-splines
-    p_k::AbstractVector{<:Real} # Array specifying the prior probability p(k)
-    _norm_fac::AbstractMatrix{<:Real} # K×(K-3) matrix of normalization factors
+    K::Int
+    a_mat::AbstractMatrix{<:Real}
+    p_k::AbstractVector{<:Real}
+    _norm_fac::AbstractMatrix{<:Real}
 
     function CubicSplineDist(K::Int, a_mat::AbstractMatrix{<:Real}, p_k::AbstractArray{<:Real})
         if !isapprox(sum(p_k), 1.0)
@@ -15,15 +15,21 @@ end
 CubicSplineDist(K::Int, a_mat::AbstractMatrix{<:Real}) = CubicSplineDist(K, a_mat, fill(1.0/(K-3.0), K-3))
 
 # Simple constructor, initializes a_mat corresponding to a uniform prior mean
-function CubicSplineDist(K::Int)
+function CubicSplineDist(K::Int; a::Real=1.0)
     a_mat = Matrix{Float64}(undef, K, K-3)
     for k = 4:K
-        a_mat[1:k,k-3] = coef_to_theta(fill(1.0, k), k)
+        a_mat[1:k,k-3] = coef_to_theta(fill(a, k), k)
     end
     return CubicSplineDist(K, a_mat, fill(1.0/(K-3.0), K-3))
 end
 
-# Can create a constructor later that takes in a given density and that centers the prior on this, but not a high priority rn
+# Implement rand method (should probably return a spline)
+function rand(rng::AbstractRNG, d::CubicSplineDist)
+    k = rand(rng, DiscreteNonParametric(4:d.K, d.p_k))
+    θ = rand(rng, Dirichlet(@views(d.a_mat[1:k, k-3])))
+    b = BSplineBasis(BSplineOrder(4), LinRange(0.0, 1.0, k-2))
+    return Spline(b, theta_to_coef(θ, k))
+end
 
 # Mean of the random cubic spline, evaluated at a single x
 function mean(d::CubicSplineDist, x::Real)
@@ -40,8 +46,6 @@ function mean(d::CubicSplineDist, x::Real)
     end
     return val
 end
-
-# This is considerably faster, worth keeping
 function Base.broadcast(mean, d::CubicSplineDist, x::AbstractVector{<:Real})
     val = zeros(T, length(x))
     for k = 4:d.K # k is the number of basis functions
@@ -52,8 +56,19 @@ function Base.broadcast(mean, d::CubicSplineDist, x::AbstractVector{<:Real})
     end
     return val
 end
-# Implement rand method (should probably return a spline)
-#function rand(rng::AbstractRNG, d::CubicSplineDist)
+
+# Evaluate the q-quantile of f(x)
+function quantile(d::CubicSplineDist, x::AbstractVector{<:Real}, q::AbstractVector{<:Real}; rng::AbstractRNG=Xoshiro(), sim::Int=500)
+    n_eval = length(x)
+    q_val = Array{Float64}(undef, n_eval, length(q))
+    fs = Array{Float64}(undef, n_eval, sim)
+    for i in 1:sim
+        s = rand(rng, d)
+        fs[1:n_eval, i] = s.(x)
+    end
+    quantiles = [quantile(row, q) for row in eachrow(fs)]
+    return val
+end
 
 #= function test_evaluate()
     K = 50

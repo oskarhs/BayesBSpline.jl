@@ -3,7 +3,7 @@ module BayesBSpline
 using BSplineKit
 export BSplineKit
 
-using Random, Distributions, Memoization
+using Random, Distributions, Base.Threads
 #using Plots
 
 import Distributions: mean, ContinuousUnivariateDistribution

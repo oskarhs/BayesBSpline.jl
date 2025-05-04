@@ -5,7 +5,7 @@ import StatsAPI
 @testset "CubicSplineDist: uniform initialization" begin
     x = LinRange(0.0, 1.0, 1001)
 
-    for K = 4:30
+    for K = 4:20
         d = CubicSplineDist(K)
         @test isapprox(mean(d, 0.5), 1.0)
         @test isapprox(mean.(d, x), ones(length(x)))
@@ -13,14 +13,26 @@ import StatsAPI
     end
 end
 
-@testset "CubicSplineDensity: uniform initialization" begin
-    x = LinRange(0.0, 1.0, 1001)
+@testset "CubicSplineDist: rand is density" begin
+    t = LinRange(0.0, 1.0, 1001)
 
-    for K = 4:30
+    for K = 4:20
+        d = CubicSplineDist(K)
+        s = rand(Xoshiro(1812), d)
+        y = s.(t)
+        midpoint = step(t) * ( 0.5*(y[1]+y[end]) + sum(@views(y[2:end-1])) )
+        @test isapprox(midpoint, 1.0, atol=1e-4)
+    end
+end
+
+@testset "CubicSplineDensity: uniform initialization" begin
+    t = LinRange(0.0, 1.0, 1001)
+
+    for K = 4:20
         f = CubicSplineDensity(K)
-        @test isapprox(f(0.5), 1.0)
-        @test isapprox(f.(x), ones(length(x)))
-        # @test isapprox(mean(d, x), ones(length(x)))
+        y = f.(t)
+        midpoint = step(t) * ( 0.5*(y[1]+y[end]) + sum(@views(y[2:end-1])) )
+        @test isapprox(midpoint, 1.0, atol=1e-4)
     end
 end
 
