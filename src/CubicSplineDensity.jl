@@ -1,7 +1,7 @@
 """
     struct CubicSplineDensity(K::Int)
 
-Struct used to fit a mixture of b-spline mixtures of variable dimension via maximum likelihood. 
+Struct used to fit a variable-dimension b-spline mixture via maximum likelihood. 
 
 `K` controls the maximum number of splines used for the computation, offering a tradeoff between greater model flexibility and computational efficiency.
 Main usage is through the `fit` function.    
