@@ -68,7 +68,6 @@ end
     mean(d::CubicSplineDist, x::Real)
 
 Compute the mean of the random density `d` at a given point `x`.
-```
 """
 function mean(d::CubicSplineDist, x::Real) # add range chekcs here later
     val = 0.0
@@ -101,12 +100,10 @@ end
 Compute the `q`-quantiles of `d` evaluated at the points `x` via Monte Carlo.
 
 The keyword argument `n_sim` controls the number of simulations used to compute the estimate. Defaults to `n_sim = 500`.
-```
 """
 function quantile(rng::AbstractRNG, d::CubicSplineDist, x::AbstractVector{<:Real}, q::AbstractVector{<:Real}; n_sim::Int=500)
     n_eval = length(x)
-    q_val = Array{Float64}(undef, n_eval, length(q))
-    fs = Array{Float64}(undef, n_eval, n_sim)
+    fs = Matrix{Float64}(undef, n_eval, n_sim)
     for i in 1:n_sim
         s = rand(rng, d)
         fs[1:n_eval, i] = s.(x)
