@@ -1,4 +1,4 @@
-using Random, Statistics, BandedMatrices
+using Random, Statistics
 using ForwardDiff
 using LinearAlgebra, Distributions, BSplineKit, Plots, Optim, Integrals
 
@@ -81,18 +81,58 @@ p0 = coef_to_theta(ones(K))
 # Extend this to cover the case where the variance has its own prior too.
 # I think in this case we just get a T-distribution on μ instead of the normal, which does not complicate the optimization
 function loss(μ_k, p0, p0_cum, k, τ2)
-    prob = solve(IntegralProblem((x, p) -> pdf(Normal(μ_k, sqrt(τ2/(1-φ^2))), x) * sigmoid(x), (-Inf, Inf)), QuadGKJL()).u
+    prob = solve(IntegralProblem((x, p) -> pdf(Normal(μ_k, sqrt(τ2)), x) * sigmoid(x), (-Inf, Inf)), QuadGKJL()).u
     return (p0[k] - (1-p0_cum[k])*prob)^2
 end
 
+# Use for k ≥ 2
+# Also: reuse the same random sample
+function loss1(μ_k, p0, k, z, τ)
+    samp = Vector{Float64}(undef, size(z, 1))
+    for m in 1:size(z, 1)
+        ϵ_k = μ_k + τ[m] * z[m,k]
+        β = vcat(ϵ_k, zeros(length(p0)-1-k)) # Just augment with zeros, the values of the remaining β's do not matter
+        samp[m] = stickbreaking(β)[k]
+    end
+    return (p0[k] - mean(samp))^2
+end
+function loss2(μ_k, μ, p0, k, z, τ)
+    samp = Vector{Float64}(undef, size(z, 1))
+    for m in 1:size(z, 1)
+        ϵ = μ + τ[m] * z[m,1:k-1]
+        ϵ_k = μ_k + τ[m] * z[m,k]
+        β = vcat(ϵ, ϵ_k, zeros(length(p0)-1-k)) # Just augment with zeros, the values of the remaining β's do not matter
+        samp[m] = stickbreaking(β)[k]
+    end
+    return (p0[k] - mean(samp))^2
+end
+#= k = 2
+lossfunc = μ_k -> loss2(μ_k, μ[1:k-1], p0, k, τ2)
+res = Optim.optimize(lossfunc, -20, 20, GoldenSection())
+Optim.minimizer(res) =#
 
 τ2 = 1
 μ = zeros(K-1)
 p0_cum = vcat(0, cumsum(p0))
+
 for k in 1:K-1
     lossfunc = μ_k -> loss(μ_k, p0, p0_cum, k, τ2)
-    res = Optim.optimize(lossfunc, -20, 20, GoldenSection())
+    res = Optim.optimize(lossfunc, -30, 20, GoldenSection())
     μ[k] = Optim.minimizer(res)
+end
+
+
+z = rand(rng, Normal(), (10000, 49))
+τ = rand(rng, InverseGamma(2, 1), 10000)
+μ_new = zeros(K-1)
+lossfunc = μ_k -> loss1(μ_k, p0, 1, z, τ)
+res = Optim.optimize(lossfunc, -40, 20, GoldenSection())
+μ_new[1] = Optim.minimizer(res)
+for k in 2:K-1
+    println(k)
+    lossfunc = μ_k -> loss2(μ_k, μ_new[1:k-1], p0, k, z, τ)
+    res = Optim.optimize(lossfunc, -40, 20, GoldenSection())
+    μ_new[k] = Optim.minimizer(res)
 end
 
 # For now, fix variances to be equal.
@@ -104,7 +144,7 @@ m_β = 0
 for _ in 1:M
     #a = rand(rng, InverseGamma(0.5, 1))
     #ζ = rand(rng, InverseGamma(0.5, 1/a))
-    ζ = τ2/(1-φ^2)
+    ζ = τ2
     #β = rand(rng, MvNormal(μ, Diagonal(fill(ζ, K-1))))
     β = rand(rng, MvNormal(μ, Diagonal(fill(ζ, K-1))))
     #β = rand(rng, dist)
@@ -116,10 +156,10 @@ B = 10^5
 
 draws_new = Array{Float64}(undef, B, K)
 for b in 1:B
-    #a = rand(InverseGamma(0.5, 1))
+    a = rand(rng, InverseGamma(2, 1))
     #ζ = rand(rng, InverseGamma(0.5, 1/a))
-    ζ = τ2/(1-φ^2)
-    β = rand(rng, MvNormal(μ, Diagonal(fill(ζ, K-1))))
+    #ζ = τ2
+    β = rand(rng, MvNormal(μ_new, Diagonal(fill(a^2, K-1))))
     #β = rand(rng, dist)
     draws_new[b, :] = stickbreaking(β)
 end
