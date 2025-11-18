@@ -1,5 +1,5 @@
 using Random, Statistics
-using ForwardDiff
+using ForwardDiff, BandedMatrices
 using LinearAlgebra, Distributions, BSplineKit, Plots, Optim, Integrals
 
 # Numerically stable variant of log(1 + exp(x))
@@ -123,13 +123,14 @@ for k in 1:K-1
 end
 
 
-φ = 0.9
-#φ = 1.0
+φ = 0.95
 M = 10_000
-a_δ = 9.0
+a_δ = 1.1
 b_δ = a_δ - 1
-dist_τ1 = InverseGamma(1, 1e-1)
-dist_τ2 = InverseGamma(1, 5e-3) # (1, 5e-3) yields quite symmetric prior
+#dist_τ1 = InverseGamma(1, 1e-1) # (1, 1e-1) is reasonable, but would like a bit more variance in the first component
+dist_τ1 = InverseGamma(2.5, 2.5-1)
+#dist_τ2 = InverseGamma(1, 5e-3) # (1, 5e-3) yields quite symmetric prior
+dist_τ2 = InverseGamma(1, 1e-2) # (1, 5e-3) yields quite symmetric prior
 dist_δ = InverseGamma(a_δ, b_δ) # (1, 5e-1) yields quite symmetric prior
 z = rand(rng, Normal(), (M, K-1))
 τ = sqrt.(rand(rng, dist_τ2, M))
@@ -214,8 +215,9 @@ end
 
 # Evaluate spline basis functions prior to running the mdoel.
 @model function Bsplinemix(x, μ_new, b, K, φ)
-    τ1 ~ InverseGamma(1, 1e-1)
-    τ2 ~ InverseGamma(1, 5e-3)
+    #τ1 ~ InverseGamma(1, 1e-1)
+    τ1 ~ InverseGamma(2.5, 1.5)
+    τ2 ~ InverseGamma(1, 1e-2)
     δ ~ filldist(InverseGamma(a_δ, b_δ), K-2)
     #β ~ arraydist([Normal(μ_new[k], sqrt(τ2 * δ[k])) for k in 1:K-1])
     β = Vector{Float64}(undef, K-1)
@@ -227,23 +229,78 @@ end
     Turing.@addlogprob! myloglik(x, θ, b)
 end
 
-ground_truth = Beta(3,3)
-x = rand(rng, ground_truth, 5000)
+mix = BetaMixture(
+    [0.4, 0.6],  # mixture weights
+    [Beta(50, 120), Beta(3, 1.5)]
+)
+#ground_truth = Beta(3,3)
+ground_truth = mix
+x = rand(rng, ground_truth, 500)
 model = Bsplinemix(x, μ_new, b, K, φ)
 chn = sample(rng, model, NUTS(), 1000)
 
 t = LinRange(0, 1, 10001)
 θ = mean(chn).nt.mean[100:end]
 S = Spline(b, theta_to_coef(θ, K))
-Plots.plot(t, S.(t))
-Plots.ylims!(-0.05*maximum(S.(t)), 1.05*maximum(S.(t)))
+p = Plots.plot()
+Plots.plot!(p, t, S.(t), color=:black, lwd=2.0)
+Plots.ylims!(p, -0.05*maximum(S.(t)), 1.05*maximum(S.(t)))
 
-histogram!(x, normalize=:pdf, bins=50, alpha=0.5)
+histogram!(p, x, normalize=:pdf, bins=50, alpha=0.5)
 
 kdest = PosteriorStats.kde_reflected(x, bounds=(0,1))
-plot!(kdest.x, kdest.density)
-plot!(ground_truth)
-ylims!(0.0, 2.5)
+plot!(kdest.x, kdest.density, color=:red, lwd=2.0)
+plot!(p, t, pdf(ground_truth, t))
+ylims!(p, 0.0, 5.5)
 
-t0 = LinRange(0, 10, 10001)
-plot(t0, pdf(InverseGamma(a_δ, b_δ), t0), xticks=0:1:10)
+#t0 = LinRange(0, 10, 10001)
+#plot(t0, pdf(InverseGamma(a_δ, b_δ), t0), xticks=0:1:10)
+
+
+
+
+using Distributions, StatsPlots
+
+# Define a custom Beta mixture distribution type
+struct BetaMixture <: ContinuousUnivariateDistribution
+    weights::Vector{Float64}
+    components::Vector{Beta}
+end
+
+# Constructor with normalization of weights
+function BetaMixture(weights::Vector{Float64}, comps::Vector{Beta})
+    w = weights ./ sum(weights)
+    return BetaMixture(w, comps)
+end
+
+# PDF
+function Distributions.pdf(d::BetaMixture, x::Real)
+    sum(w * pdf(c, x) for (w, c) in zip(d.weights, d.components))
+end
+
+# Sampling
+function Base.rand(rng::AbstractRNG, d::BetaMixture, n::Int=1)
+    z = rand(Categorical(d.weights), n)
+    xs = similar(rand(d.components[1], n))
+    for i in 1:n
+        xs[i] = rand(d.components[z[i]])
+    end
+    return xs
+end
+
+propertynames(chn[Symbol("τ1")])
+chn[Symbol("τ1")].data
+
+varmeans = Vector{Float64}(undef, K-2)
+for k in 1:K-2
+    varmeans[k] = mean(chn[Symbol("τ2")].data .* chn[Symbol("δ[$k]")].data)
+end
+plot(varmeans)
+
+BandedMatrix(-1 => -φ / σ2, 0 => , 1 => -φ / σ2)
+
+Q = Symmetric(BandedMatrix(-1 => [-0.5], 0 => [1.0, 1.0], 1 => [-0.5]))
+MvNormalCanon([0.0, 0.0], Q)
+
+# So we can actually do parameterize the normal this way.
+# This is really nice.
