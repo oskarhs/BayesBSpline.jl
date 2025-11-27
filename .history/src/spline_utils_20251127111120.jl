@@ -117,7 +117,7 @@ end
 # Create the k'th unit vector in the canonical basis for R^K.
 function unitvector(K::Int, k::Int, T)
     if !(1 ≤ k ≤ K)
-        throw(ArgumentError("Index out of range."))
+        throw(ArgumentError(""))
     end
     unitvec = zeros(T, K)
     unitvec[k] = 1

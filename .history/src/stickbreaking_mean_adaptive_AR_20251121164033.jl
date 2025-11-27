@@ -70,7 +70,6 @@ function coef_to_theta(coef::AbstractVector{T}) where {T<:AbstractFloat}
     return θ
 end
 
-
 # We adjust params of β[1] first, then β[2] and so on
 K = 50
 rng = Random.default_rng()
@@ -190,7 +189,7 @@ p
 # This approach works, we recover something close to the true density with enough samples, but there is too little smoothing!
 # I think it is 
 
-τ1 = rand(rng, dist_τ1)
+τ1 = rand(rng, dist_τ)
 τ2 = rand(rng, dist_τ2)
 δ = rand(rng, dist_δ, K-1)
 β = Vector{Float64}(undef, K-1)
@@ -198,7 +197,7 @@ p
 for k in 2:K-1
     β[k] = μ_new[k] + φ * (β[k-1] - μ_new[k-1]) + sqrt(τ2 * δ[k-1]) * rand(rng, Normal())
 end
-S = Spline(basis, theta_to_coef(stickbreaking(β)))
+S = Spline(basis, theta_to_coef(stickbreaking(β), K))
 Plots.plot(t, S.(t))
 Plots.ylims!(-0.05*maximum(S.(t)), 1.05*maximum(S.(t)))
 
@@ -216,10 +215,9 @@ end
 
 # Evaluate spline basis functions prior to running the mdoel.
 @model function Bsplinemix(x, μ_new, b, K, φ)
-    τ1 ~ InverseGamma(1, 1e-1)
-    #τ1 ~ InverseGamma(2.5, 1.5)
-    #τ2 ~ InverseGamma(1, 1e-2)
-    τ2 ~ InverseGamma(1, 5e-3)
+    #τ1 ~ InverseGamma(1, 1e-1)
+    τ1 ~ InverseGamma(2.5, 1.5)
+    τ2 ~ InverseGamma(1, 1e-2)
     δ ~ filldist(InverseGamma(a_δ, b_δ), K-2)
     #β ~ arraydist([Normal(μ_new[k], sqrt(τ2 * δ[k])) for k in 1:K-1])
     β = Vector{Float64}(undef, K-1)
@@ -227,14 +225,14 @@ end
     for k in 2:K-1
         β[k] ~ Normal(μ_new[k] + φ * (β[k-1] - μ_new[k-1]), sqrt(τ2 * δ[k-1]))
     end
-    θ := stickbreaking(β)
+    θ := BayesBSpline.stickbreaking(β)
     Turing.@addlogprob! myloglik(x, θ, b)
 end
 
-#= mix = BetaMixture(
+mix = BetaMixture(
     [0.4, 0.6],  # mixture weights
     [Beta(50, 120), Beta(3, 1.5)]
-) =#
+)
 ground_truth = Beta(3,3)
 #ground_truth = mix
 x = rand(rng, ground_truth, 500)
@@ -243,7 +241,7 @@ chn = sample(rng, model, NUTS(), 1000)
 
 t = LinRange(0, 1, 10001)
 θ = mean(chn).nt.mean[100:end]
-S = Spline(basis, theta_to_coef(θ))
+S = Spline(basis, BayesBSpline.theta_to_coef(θ))
 p = Plots.plot()
 Plots.plot!(p, t, S.(t), color=:black, lwd=2.0)
 Plots.ylims!(p, -0.05*maximum(S.(t)), 1.05*maximum(S.(t)))

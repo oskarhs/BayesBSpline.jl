@@ -70,7 +70,6 @@ function coef_to_theta(coef::AbstractVector{T}) where {T<:AbstractFloat}
     return θ
 end
 
-
 # We adjust params of β[1] first, then β[2] and so on
 K = 50
 rng = Random.default_rng()
@@ -198,7 +197,7 @@ p
 for k in 2:K-1
     β[k] = μ_new[k] + φ * (β[k-1] - μ_new[k-1]) + sqrt(τ2 * δ[k-1]) * rand(rng, Normal())
 end
-S = Spline(basis, theta_to_coef(stickbreaking(β)))
+S = Spline(basis, theta_to_coef(stickbreaking(β), K))
 Plots.plot(t, S.(t))
 Plots.ylims!(-0.05*maximum(S.(t)), 1.05*maximum(S.(t)))
 
@@ -231,10 +230,10 @@ end
     Turing.@addlogprob! myloglik(x, θ, b)
 end
 
-#= mix = BetaMixture(
+mix = BetaMixture(
     [0.4, 0.6],  # mixture weights
     [Beta(50, 120), Beta(3, 1.5)]
-) =#
+)
 ground_truth = Beta(3,3)
 #ground_truth = mix
 x = rand(rng, ground_truth, 500)

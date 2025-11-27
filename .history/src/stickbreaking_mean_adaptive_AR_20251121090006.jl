@@ -70,7 +70,6 @@ function coef_to_theta(coef::AbstractVector{T}) where {T<:AbstractFloat}
     return θ
 end
 
-
 # We adjust params of β[1] first, then β[2] and so on
 K = 50
 rng = Random.default_rng()
@@ -90,7 +89,7 @@ end
 # Also: reuse the same random sample
 function loss1(μ_k, p0, k, z, τ1)
     samp = Vector{Float64}(undef, size(z, 1))
-    for m in axes(z, 1)
+    for m in 1:size(z, 1)
         ϵ_k = μ_k + τ1[m] * z[m,k]
         β = vcat(ϵ_k, zeros(length(p0)-1-k)) # Just augment with zeros, the values of the remaining β's do not matter
         samp[m] = stickbreaking(β)[k]
@@ -99,7 +98,7 @@ function loss1(μ_k, p0, k, z, τ1)
 end
 function loss2(μ_k, μ, p0, k, z, τ1, τ, δ, φ)
     samp = Vector{Float64}(undef, size(z, 1))
-    for m in axes(z, 1)
+    for m in 1:size(z, 1)
         ϵ = Vector{Float64}(undef, k)
         ϵ[1] = μ[1] + τ1[m] * z[m,1]
         for j in 2:k-1
@@ -128,10 +127,10 @@ end
 M = 10_000
 a_δ = 1.1
 b_δ = a_δ - 1
-dist_τ1 = InverseGamma(1, 1e-1) # (1, 1e-1) is reasonable, but would like a bit more variance in the first component
-#dist_τ1 = InverseGamma(2.5, 2.5-1)
-dist_τ2 = InverseGamma(1, 5e-3) # (1, 5e-3) yields quite symmetric prior
-#dist_τ2 = InverseGamma(1, 1e-2) # (1, 5e-3) yields quite symmetric prior
+#dist_τ1 = InverseGamma(1, 1e-1) # (1, 1e-1) is reasonable, but would like a bit more variance in the first component
+dist_τ1 = InverseGamma(2.5, 2.5-1)
+#dist_τ2 = InverseGamma(1, 5e-3) # (1, 5e-3) yields quite symmetric prior
+dist_τ2 = InverseGamma(1, 1e-2) # (1, 5e-3) yields quite symmetric prior
 dist_δ = InverseGamma(a_δ, b_δ) # (1, 5e-1) yields quite symmetric prior
 z = rand(rng, Normal(), (M, K-1))
 τ = sqrt.(rand(rng, dist_τ2, M))
@@ -168,13 +167,13 @@ q95 = [quantile(draws_new[:, k], 0.95) for k in 1:K]
 q50 = [quantile(draws_new[:, k], 0.5) for k in 1:K]
 priormean = vec(mean(draws_new, dims=1))
 t = LinRange(0, 1, 10001)
-basis = BSplineBasis(BSplineOrder(4), LinRange(0.0, 1.0, K-2))
+b = BSplineBasis(BSplineOrder(4), LinRange(0.0, 1.0, K-2))
 p = Plots.plot()
 thetas = [priormean, q05, q50, q95]
 labs = ["Mean", "Lower quantile", "Median", "Upper quantile"]
 for i in eachindex(thetas)
     θ = thetas[i]
-    S = Spline(basis, theta_to_coef(θ))
+    S = Spline(b, theta_to_coef(θ, K))
     Plots.plot!(p, t, S.(t), label=labs[i])
     Plots.ylims!(p, -0.05*maximum(S.(t)), 1.05*maximum(S.(t)))
 end
@@ -190,7 +189,7 @@ p
 # This approach works, we recover something close to the true density with enough samples, but there is too little smoothing!
 # I think it is 
 
-τ1 = rand(rng, dist_τ1)
+τ1 = rand(rng, dist_τ)
 τ2 = rand(rng, dist_τ2)
 δ = rand(rng, dist_δ, K-1)
 β = Vector{Float64}(undef, K-1)
@@ -198,7 +197,7 @@ p
 for k in 2:K-1
     β[k] = μ_new[k] + φ * (β[k-1] - μ_new[k-1]) + sqrt(τ2 * δ[k-1]) * rand(rng, Normal())
 end
-S = Spline(basis, theta_to_coef(stickbreaking(β)))
+S = Spline(b, theta_to_coef(stickbreaking(β), K))
 Plots.plot(t, S.(t))
 Plots.ylims!(-0.05*maximum(S.(t)), 1.05*maximum(S.(t)))
 
@@ -216,10 +215,9 @@ end
 
 # Evaluate spline basis functions prior to running the mdoel.
 @model function Bsplinemix(x, μ_new, b, K, φ)
-    τ1 ~ InverseGamma(1, 1e-1)
-    #τ1 ~ InverseGamma(2.5, 1.5)
-    #τ2 ~ InverseGamma(1, 1e-2)
-    τ2 ~ InverseGamma(1, 5e-3)
+    #τ1 ~ InverseGamma(1, 1e-1)
+    τ1 ~ InverseGamma(2.5, 1.5)
+    τ2 ~ InverseGamma(1, 1e-2)
     δ ~ filldist(InverseGamma(a_δ, b_δ), K-2)
     #β ~ arraydist([Normal(μ_new[k], sqrt(τ2 * δ[k])) for k in 1:K-1])
     β = Vector{Float64}(undef, K-1)
@@ -231,29 +229,29 @@ end
     Turing.@addlogprob! myloglik(x, θ, b)
 end
 
-#= mix = BetaMixture(
+mix = BetaMixture(
     [0.4, 0.6],  # mixture weights
     [Beta(50, 120), Beta(3, 1.5)]
-) =#
-ground_truth = Beta(3,3)
-#ground_truth = mix
+)
+#ground_truth = Beta(3,3)
+ground_truth = mix
 x = rand(rng, ground_truth, 500)
-model = Bsplinemix(x, μ_new, basis, K, 0.95)
+model = Bsplinemix(x, μ_new, b, K, φ)
 chn = sample(rng, model, NUTS(), 1000)
 
 t = LinRange(0, 1, 10001)
 θ = mean(chn).nt.mean[100:end]
-S = Spline(basis, theta_to_coef(θ))
+S = Spline(b, theta_to_coef(θ, K))
 p = Plots.plot()
 Plots.plot!(p, t, S.(t), color=:black, lwd=2.0)
 Plots.ylims!(p, -0.05*maximum(S.(t)), 1.05*maximum(S.(t)))
 
 histogram!(p, x, normalize=:pdf, bins=50, alpha=0.5)
 
-#kdest = PosteriorStats.kde_reflected(x, bounds=(0,1))
-#plot!(kdest.x, kdest.density, color=:red, lwd=2.0)
+kdest = PosteriorStats.kde_reflected(x, bounds=(0,1))
+plot!(kdest.x, kdest.density, color=:red, lwd=2.0)
 plot!(p, t, pdf(ground_truth, t))
-#ylims!(p, 0.0, 5.5)
+ylims!(p, 0.0, 5.5)
 
 #t0 = LinRange(0, 10, 10001)
 #plot(t0, pdf(InverseGamma(a_δ, b_δ), t0), xticks=0:1:10)
