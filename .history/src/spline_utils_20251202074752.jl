@@ -5,7 +5,7 @@ softplus(x::Real) = ifelse(x ≥ 0, x + log(1+exp(-x)), log(1+exp(x)))
 sigmoid(x::Real) = ifelse(x ≥ 0, 1/(1 + exp(-x)), exp(x)/(1 + exp(x)))
 
 # Logistic
-logit(x::Real) = log(x / (1-x))
+logistic(x::Real) = log(x / (1-x))
 
 # Numerically stable softmax
 function softmax(x::AbstractVector{T}) where {T<:Real}
@@ -63,7 +63,7 @@ end
 # Compute bin counts on a regular grid consisting of `M` bins over the interval [xmin, xmax]
 function bin_regular(x::AbstractVector{T}, xmin::T, xmax::T, M::Int, right::Bool) where {T<:Real}
     R = xmax - xmin
-    bincounts = zeros(Int, M)
+    bincounts = zeros(T, M)
     edges_inc = M/R
     if right
         for val in x

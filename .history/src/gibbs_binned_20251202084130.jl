@@ -10,7 +10,6 @@ using .BayesBSpline
 # Remember to normalize:
 function create_spline_basis_matrix_binned(x::AbstractVector{T}, basis::A) where {T<:Real, A<:AbstractBSplineBasis}
     # A total of 1000 bins should suffice
-    K = length(basis)
 
     n_bins = (fld(1000, K-2)+1)*(K-2)-1 # Make the number of bins a multiple of K-2 so that at most 4 basis functions are nonzero at a time
     bincounts = BayesBSpline.bin_regular(x, 0.0, 1.0, n_bins, true)
@@ -61,6 +60,8 @@ function sample_posterior_binned(rng::Random.AbstractRNG, x::AbstractVector{T}, 
     #a_δ::T = 1.0
     #b_δ::T = 5e-4
     kwargs = Dict(
+        :a_σ => a_σ,
+        :b_σ => b_σ,
         :a_τ => a_τ,
         :b_τ => b_τ,
         :a_δ => a_δ,
@@ -241,14 +242,14 @@ function pointwise_quantiles(θ::AbstractMatrix{T}, basis::A, t, q) where {T<:Re
 end
 
 
-K = 200
+K = 100
 rng = Random.default_rng()
 #d_true = Claw()
 #d_true = StronglySkewed()
 #d_true = MixtureModel([Normal(0, 0.5), Normal(2, 0.1)], [0.4, 0.6])
-#d_true = Normal()
-d_true = Harp()
-#d_true = Kurtotic()
+d_true = Normal()
+#d_true = Harp()
+#d_true = SymTriangularDist()
 x = rand(rng, d_true, 1500)
 R = maximum(x) - minimum(x)
 x_est = (x .- minimum(x) .+ 0.05*R) / (1.1*R)
@@ -286,8 +287,6 @@ elseif typeof(d_true) <: StronglySkewed
     xlims!(p, -3.5, 3)
 elseif typeof(d_true) <: Harp
     xlims!(p, -2, 80)
-elseif typeof(d_true) <: Kurtotic
-    xlims!(p, -3.2, 3.2)
 end
 p
 

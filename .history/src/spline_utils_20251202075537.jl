@@ -63,7 +63,7 @@ end
 # Compute bin counts on a regular grid consisting of `M` bins over the interval [xmin, xmax]
 function bin_regular(x::AbstractVector{T}, xmin::T, xmax::T, M::Int, right::Bool) where {T<:Real}
     R = xmax - xmin
-    bincounts = zeros(Int, M)
+    bincounts = zeros(T, M)
     edges_inc = M/R
     if right
         for val in x

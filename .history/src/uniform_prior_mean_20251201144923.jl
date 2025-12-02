@@ -47,17 +47,17 @@ function find_uniform_prior_mean_β(rng::Random.AbstractRNG, K::Int; a_σ::T = 2
     end
     lossfunc = μ_2 -> loss2(μ_2, p0, z, σ, θ_cum)
     res = Optim.optimize(lossfunc, -40, 20, GoldenSection())
-    μ[2] = Optim.minimizer(res)
+    μ[1] = Optim.minimizer(res)
     for m in 1:M
         β[m,2] = μ[2] + σ[m,2] * z[m,2]
         θ_cum[m,2] = θ_cum[m, 1] + (1 - θ_cum[m, 1])*sigmoid(β[m,2])
     end
-    for k in 3:K-1
+    for k in 2:K-1
         lossfunc = μ_k -> loss3(μ_k, μ[1:k-1], p0, k, z, τ, δ, φ, θ_cum, β)
-        res = Optim.optimize(lossfunc, -20, 200, GoldenSection())
+        res = Optim.optimize(lossfunc, -40, 40, GoldenSection())
         μ[k] = Optim.minimizer(res)
         for m in 1:M
-            β[m,k] = μ[k] + φ * (2 * (β[m,k-1] - μ[k-1]) - (β[m,k-2] - μ[k-2])) + τ[m] * δ[m,k-1] * z[m,k]
+            β[m,k] = μ[k] + φ * (β[m,k-1] - μ[k-1]) + τ[m] * δ[m,k-1] * z[m,k]
             θ_cum[m, k] = θ_cum[m, k-1] + (1 - θ_cum[m, k-1]) * sigmoid(β[m,k])
         end
     end
@@ -89,27 +89,8 @@ end
 function loss3(μ_k::T, μ::AbstractVector{T}, p0::AbstractVector{T}, k::Int, z::AbstractMatrix{T}, τ::AbstractVector{T}, δ::AbstractMatrix{T}, φ::T, θ_cum::AbstractMatrix{T}, β::AbstractMatrix{T}) where {T<:AbstractFloat}
     θ_k = Vector{T}(undef, size(z, 1))
     for m in axes(z, 1)
-        β_k = μ_k + φ * (2 * (β[m,k-1] - μ[k-1]) - (β[m,k-2] - μ[k-2])) + τ[m] * δ[m,k-1] * z[m,k]
+        β_k = μ_k + φ * (β[m,k-1] - μ[k-1]) + τ[m] * δ[m,k-1] * z[m,k]
         θ_k[m] = (1 - θ_cum[m, k-1]) * sigmoid(β_k)
     end
     return (p0[k] - mean(θ_k))^2
-end
-
-function compute_μ(K::Int, T)
-    basis = BSplineBasis(BSplineOrder(4), LinRange(0, 1, K-2))
-    p0 = coef_to_theta(ones(T, K), basis)
-
-    μ = Vector{T}(undef, K-1)
-    θ_cum = Vector{T}(undef, K)
-    θ_cum[1] = 0
-
-    for k in 1:K-1
-        μ[k] = logit(p0[k] / (1-θ_cum[k]))
-        θ_cum[k+1] = θ_cum[k] + p0[k]
-    end
-    return μ
-end
-
-function compute_μ(K::Int)
-    return compute_μ(K, Float64)
 end

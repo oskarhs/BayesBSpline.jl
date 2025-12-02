@@ -94,22 +94,3 @@ function loss3(μ_k::T, μ::AbstractVector{T}, p0::AbstractVector{T}, k::Int, z:
     end
     return (p0[k] - mean(θ_k))^2
 end
-
-function compute_μ(K::Int, T)
-    basis = BSplineBasis(BSplineOrder(4), LinRange(0, 1, K-2))
-    p0 = coef_to_theta(ones(T, K), basis)
-
-    μ = Vector{T}(undef, K-1)
-    θ_cum = Vector{T}(undef, K)
-    θ_cum[1] = 0
-
-    for k in 1:K-1
-        μ[k] = logit(p0[k] / (1-θ_cum[k]))
-        θ_cum[k+1] = θ_cum[k] + p0[k]
-    end
-    return μ
-end
-
-function compute_μ(K::Int)
-    return compute_μ(K, Float64)
-end
