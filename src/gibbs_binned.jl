@@ -69,7 +69,7 @@ function sample_posterior_binned(rng::Random.AbstractRNG, x::AbstractVector{T}, 
     )
 
     # Here: determine μ via the medians (e.g. we penalize differences away from the values that yield a uniform prior mean)
-    μ = BayesBSpline.compute_μ(K, T)
+    μ = BayesBSpline.compute_μ(basis, T)
 
     # Set up penalty matrix:
     P = BandedMatrix((0=>fill(1, K-3), 1=>fill(-2, K-3), 2=>fill(1, K-3)), (K-3, K-1))
