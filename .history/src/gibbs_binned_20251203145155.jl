@@ -1,5 +1,10 @@
-#include(joinpath(@__DIR__, "BayesBSpline.jl"))
-#using .BayesBSpline
+using Random, Statistics
+using ForwardDiff, BandedMatrices
+using LinearAlgebra, Distributions, BSplineKit, Plots, Optim
+using PolyaGammaHybridSamplers, PosteriorStats, KernelDensity
+
+include(joinpath(@__DIR__, "BayesBSpline.jl"))
+using .BayesBSpline
 
 # Evaluate basis functions for all observations:
 # Remember to normalize:
@@ -40,7 +45,7 @@ end
 function sample_posterior_binned(rng::Random.AbstractRNG, x::AbstractVector{T}, M::Int, K::Int) where {T<:Real}
     basis = BSplineBasis(BSplineOrder(4), LinRange(0, 1, K-2))
     #basis = PSplineBasis(BSplineOrder(4), K)
-    B, b_ind, bincounts = create_spline_basis_matrix_binned(x, basis)
+    B, b_ind, bincounts= create_spline_basis_matrix_binned(x, basis)
     bincounts = bincounts
     n_bins = length(bincounts)
     n = length(x)
@@ -49,8 +54,12 @@ function sample_posterior_binned(rng::Random.AbstractRNG, x::AbstractVector{T}, 
     # Can choose a_σ, b_σ differently based on whether or not we 
     a_τ::T = 1.0
     b_τ::T = 1e-3
+    #a_δ::T = 1.1
+    #b_δ::T = 0.1
     a_δ::T = 0.5
     b_δ::T = 0.5
+    #a_δ::T = 1.0
+    #b_δ::T = 5e-4
     kwargs = Dict(
         :a_τ => a_τ,
         :b_τ => b_τ,
@@ -89,7 +98,7 @@ function sample_posterior_binned(rng::Random.AbstractRNG, x::AbstractVector{T}, 
         # Update δ2: (some inefficiencies here, but okay for now)
         for k in 1:K-3
             a_δ_k_new = a_δ + T(0.5)
-            b_δ_k_new = b_δ + T(0.5) * abs2( β[k+2,m-1] -  μ[k+2] - ( 2*(β[k+1,m-1] - μ[k+1]) - (β[k,m-1] - μ[k]) )) / τ2
+            b_δ_k_new = b_δ + T(0.5) * abs2( β[k+2,m-1] -  μ[k+2] - φ *( 2*(β[k+1,m-1] - μ[k+1]) - (β[k,m-1] - μ[k]) )) / τ2
             δ2[k] = rand(rng, InverseGamma(a_δ_k_new, b_δ_k_new))
             #δ2[k] = 1.0
         end
@@ -98,7 +107,7 @@ function sample_posterior_binned(rng::Random.AbstractRNG, x::AbstractVector{T}, 
         a_τ_new = a_τ + T(0.5) * (K - 3)
         b_τ_new = b_τ
         for k in 1:K-3
-            b_τ_new += T(0.5) * abs2( β[k+2,m-1] -  μ[k+2] - ( 2*(β[k+1,m-1] - μ[k+1]) - (β[k,m-1] - μ[k]) )) / δ2[k]
+            b_τ_new += T(0.5) * abs2( β[k+2,m-1] -  μ[k+2] - φ *( 2*(β[k+1,m-1] - μ[k+1]) - (β[k,m-1] - μ[k]) )) / δ2[k]
         end
         τ2 = rand(rng, InverseGamma(a_τ_new, b_τ_new))
         #τ2 = 0.01
@@ -154,7 +163,7 @@ function sample_posterior_binned(rng::Random.AbstractRNG, x::AbstractVector{T}, 
         δ2s[:,m] = δ2
     end
 
-    return θ, β, τ2s, δ2s, kwargs
+    return mapslices(stickbreaking, θ; dims=1), θ, β, τ2s, δ2s, kwargs
 end
 
 function samples_as_matrix(β::AbstractMatrix{T}, σ2s::AbstractVector{T}, τ2s::AbstractVector{T}, δ2s::AbstractMatrix{T}) where {T<:Real}
@@ -210,7 +219,7 @@ function pointwise_quantiles(θ::AbstractMatrix{T}, basis::A, t::AbstractVector{
 end
 
 
-#= K = 100
+K = 100
 rng = Random.default_rng()
 #d_true = Claw()
 #d_true = StronglySkewed()
@@ -257,4 +266,4 @@ plot([mean(δ2s[k, 1001:M]) for k in 1:K-3])
 #plot(δ2s[1001:M, 1])
 
 basis = BSplineBasis(BSplineOrder(4), LinRange(0, 1, K-2))
-gm = galerkin_matrix(BSplineBasis(BSplineOrder(4), LinRange(0, 1, K-2)), (Derivative(2), Derivative(2))) =#
+gm = galerkin_matrix(BSplineBasis(BSplineOrder(4), LinRange(0, 1, K-2)), (Derivative(2), Derivative(2)))

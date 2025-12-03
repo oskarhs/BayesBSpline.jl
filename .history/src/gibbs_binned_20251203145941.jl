@@ -1,3 +1,8 @@
+using Random, Statistics
+using ForwardDiff, BandedMatrices
+using LinearAlgebra, Distributions, BSplineKit, Plots, Optim
+using PolyaGammaHybridSamplers, PosteriorStats, KernelDensity
+
 #include(joinpath(@__DIR__, "BayesBSpline.jl"))
 #using .BayesBSpline
 
@@ -154,7 +159,7 @@ function sample_posterior_binned(rng::Random.AbstractRNG, x::AbstractVector{T}, 
         δ2s[:,m] = δ2
     end
 
-    return θ, β, τ2s, δ2s, kwargs
+    return mapslices(stickbreaking, θ; dims=1), θ, β, τ2s, δ2s, kwargs
 end
 
 function samples_as_matrix(β::AbstractMatrix{T}, σ2s::AbstractVector{T}, τ2s::AbstractVector{T}, δ2s::AbstractMatrix{T}) where {T<:Real}
@@ -210,7 +215,7 @@ function pointwise_quantiles(θ::AbstractMatrix{T}, basis::A, t::AbstractVector{
 end
 
 
-#= K = 100
+K = 100
 rng = Random.default_rng()
 #d_true = Claw()
 #d_true = StronglySkewed()
@@ -257,4 +262,4 @@ plot([mean(δ2s[k, 1001:M]) for k in 1:K-3])
 #plot(δ2s[1001:M, 1])
 
 basis = BSplineBasis(BSplineOrder(4), LinRange(0, 1, K-2))
-gm = galerkin_matrix(BSplineBasis(BSplineOrder(4), LinRange(0, 1, K-2)), (Derivative(2), Derivative(2))) =#
+gm = galerkin_matrix(BSplineBasis(BSplineOrder(4), LinRange(0, 1, K-2)), (Derivative(2), Derivative(2)))

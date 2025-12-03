@@ -108,6 +108,25 @@ function compute_μ(basis::A, T::Type{<:Real}=Float64) where {A<:AbstractBSpline
 end
 
 """
+    NormalizedBSplineBasis{A, T}
+
+Compute the 
+"""
+struct NormalizedBSplineBasis{A<:AbstractBSplineBasis, T::Type{<:Real}} <: AbstractBSplineBasis
+    basis::A
+    norm_fac::Vector{T}
+
+    function NormalizedBSplineBasis(basis::A, T::Type{<:Real}) where {A}
+        norm_fac = compute_norm_fac(basis, T)
+        return new{A, T}(basis, norm_fac)
+    end
+end
+
+NormalizedBSplineBasis(basis::A) where {A<:AbstractBSplineBasis} = NormalizedBSplineBasis(basis, Float64)
+
+Base.parent(norm_basis::NormalizedBSplineBasis) = norm_basis.basis
+
+"""
     PSplineBasis(m::Integer, K::Integer, T::Type{<:AbstractFloat}=Float64)
 
 Helper function to construct a K-dimensional P-spline basis of a given order spanning the interval [0, 1].

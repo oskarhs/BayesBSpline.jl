@@ -154,7 +154,7 @@ function sample_posterior_binned(rng::Random.AbstractRNG, x::AbstractVector{T}, 
         δ2s[:,m] = δ2
     end
 
-    return θ, β, τ2s, δ2s, kwargs
+    return mapslices(stickbreaking, θ; dims=1), θ, β, τ2s, δ2s, kwargs
 end
 
 function samples_as_matrix(β::AbstractMatrix{T}, σ2s::AbstractVector{T}, τ2s::AbstractVector{T}, δ2s::AbstractMatrix{T}) where {T<:Real}

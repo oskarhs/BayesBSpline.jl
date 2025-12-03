@@ -3,7 +3,7 @@ module BayesBSpline
 using BSplineKit
 export BSplineKit
 
-using Random, Distributions, Base.Threads, Optim, StatsBase, BandedMatrices, PolyaGammaHybridSamplers, LinearAlgebra
+using Random, Distributions, Base.Threads, Optim, StatsBase, BandedMatrices
 #using Plots
 
 import Distributions: mean, quantile, ContinuousUnivariateDistribution
