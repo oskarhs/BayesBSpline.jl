@@ -1,34 +1,48 @@
-#= using Random, Statistics
+using Random, Statistics
 using ForwardDiff, BandedMatrices
 using LinearAlgebra, Distributions, BSplineKit, Plots, Optim
 using PolyaGammaHybridSamplers, Memoization, PosteriorStats
 
 include(joinpath(@__DIR__, "BayesBSpline.jl"))
 using .BayesBSpline
- =#
+
 # Evaluate basis functions for all observations:
 # Remember to normalize:
+function create_spline_basis_matrix(x::AbstractVector{T}, K::Int) where {T<:Real}
+    basis = BSplineBasis(BSplineOrder(4), LinRange(0, 1, K-2))
+    n = length(x)
+    b_ind = Vector{Int}(undef, n)
+    B = Matrix{T}(undef, (n, 4))
+    norm_fac = BayesBSpline.compute_norm_fac(K)[1:K, end]
+    # Note: BSplineKit returns the evaluated spline functions in "reverse" order
+    for i in eachindex(x)
+        j, basis_eval = basis(x[i])
+        b_ind[i] = j-3 # So we compute b_{j-3}, b_{j-2}, b_{j-1} and b_j for x_i
+        B[i,:] .= reverse(basis_eval) .* norm_fac[b_ind[i]:b_ind[i]+3]
+    end
+    return B, b_ind
+end
 
-
-# To do: make a multithreaded version (also one for unbinned data)
-function sample_posterior(rng::AbstractRNG, bsm::BSMModel{T, A, NamedTuple{(:B, :b_ind, :bincounts, :n), Vals}}, n_samples::Integer, n_burnin::Integer) where {T, A, Vals}
-    basis = BSplineKit.basis(bsm)
-    K = length(basis)
+# To do: make a multithreaded version
+function sample_posterior(rng::AbstractRNG=Random.default_rng(), bsm::BSMModel{T, A, NT}, n_samples::Integer, n_burnin::Integer) where {T, A, NT}
+    basis = basis(bsm)
     (; B, b_ind, bincounts, n) = bsm.data
     n_bins = length(bincounts)
 
     # Prior Hyperparameters
+    # Can choose a_σ, b_σ differently based on whether or not we 
     a_τ, b_τ, a_δ, b_δ = params(bsm)
 
-    # TODO store μ and P as part of bsm.data
     # Here: determine μ via the medians (e.g. we penalize differences away from the values that yield a uniform prior mean)
-    μ = compute_μ(basis, T)
+    μ = BayesBSpline.compute_μ(basis, T)
 
     # Set up penalty matrix:
     P = BandedMatrix((0=>fill(1, K-3), 1=>fill(-2, K-3), 2=>fill(1, K-3)), (K-3, K-1))
+
+    # Prior for β in this case is improper. Need difference matrix.
     
-    β = Matrix{T}(undef, (K-1, n_samples))
-    β[:,1] = copy(μ)
+    β = Matrix{T}(undef, (K-1, M))
+    β[:,1] = T.(μ)
     log_B = log.(B)
     τ2 = one(T)                # Global smoothing parameter
     δ2 = Vector{T}(undef, K-3) # Local smoothing parameters
@@ -36,16 +50,16 @@ function sample_posterior(rng::AbstractRNG, bsm::BSMModel{T, A, NamedTuple{(:B, 
 
     logprobs = Vector{T}(undef, 4)  # class label probabilities
 
-    θ = Matrix{T}(undef, (K, n_samples)) # Mixture probabilities
+    θ = Matrix{T}(undef, (K, M)) # Mixture probabilities
     θ[:, 1] = max.(eps(), BayesBSpline.stickbreaking(β[:, 1]))
     θ[:, 1] = θ[:, 1] / sum(θ[:, 1])
     log_θ = similar(θ)
     log_θ[:, 1] = log.(θ[:,1])
-    τ2s = Vector{T}(undef, n_samples)
+    τ2s = Vector{T}(undef, M)
     τ2s[1] = τ2
-    δ2s = Matrix{T}(undef, (K-3, n_samples))
+    δ2s = Matrix{T}(undef, (K-3, M))
 
-    for m in 2:n_samples
+    for m in 2:M
 
         # Update δ2: (some inefficiencies here, but okay for now)
         for k in 1:K-3
@@ -64,11 +78,12 @@ function sample_posterior(rng::AbstractRNG, bsm::BSMModel{T, A, NamedTuple{(:B, 
         τ2 = rand(rng, InverseGamma(a_τ_new, b_τ_new))
         #τ2 = 0.01
 
-        # Update z (N and S)
+        # Update z
         N = zeros(Int, K)               # class label counts (of z[i]'s)
         for i in 1:n_bins
             # Compute the four nonzero probabilities:
             k0 = b_ind[i]
+            #logprobs = Vector{T}(undef, 4)
             for l in 1:4
                 k = k0 + l - 1
                 #= if k != K
@@ -114,7 +129,7 @@ function sample_posterior(rng::AbstractRNG, bsm::BSMModel{T, A, NamedTuple{(:B, 
         δ2s[:,m] = δ2
     end
 
-    return θ[:, n_burnin+1:end], β[:, n_burnin+1:end], τ2s[n_burnin+1:end], δ2s[:, n_burnin+1:end]
+    return θ, β, τ2s, δ2s
 end
 
 
@@ -148,7 +163,7 @@ function sample_posterior(rng::Random.AbstractRNG, x::AbstractVector{T}, M::Int)
         :b_δ => b_δ,
     )
 
-    μ = compute_μ(basis, T)
+    μ = @memoize BayesBSpline.find_uniform_prior_mean_β(rng, K; kwargs...)
     
     β = Matrix{T}(undef, (K-1, M))
     β[:,1] = T.(BayesBSpline.μ_50)
@@ -162,7 +177,7 @@ function sample_posterior(rng::Random.AbstractRNG, x::AbstractVector{T}, M::Int)
     θ = Matrix{T}(undef, (K, M)) # Mixture probabilities
     log_θ = similar(θ)
     θ[:, 1] = BayesBSpline.stickbreaking(β[:, 1])
-    log_θ[:,1] = log.(θ[:,1])
+    #log_θ[:,1] = log.(θ[:,1])
 
     for m in 2:M
         # Update σ2:
@@ -199,8 +214,7 @@ function sample_posterior(rng::Random.AbstractRNG, x::AbstractVector{T}, M::Int)
                     sumterm = sum(@. -log(cosh(T(0.5)*β[1:K-1, m-1])) - T(0.5) * β[1:K-1, m-1] - log(T(2)))
                     logprobs[l] = log(B[i, l]) + sumterm
                 end =#
-                # logprobs[l] = log_B[i,l] + log(θ[k,m-1])
-                logprobs[l] = log_B[i,l] + log_θ[k,m-1] 
+                logprobs[l] = log_B[i,l] + log(θ[k,m-1]) 
             end
             probs = BayesBSpline.softmax(logprobs)
             z[i] = rand(rng, DiscreteNonParametric(k0:k0+3, probs))

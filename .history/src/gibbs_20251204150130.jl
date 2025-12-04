@@ -20,7 +20,7 @@ function sample_posterior(rng::AbstractRNG, bsm::BSMModel{T, A, NamedTuple{(:B, 
     # Prior Hyperparameters
     a_τ, b_τ, a_δ, b_δ = params(bsm)
 
-    # TODO store μ and P as part of bsm.data
+    # TODO store μ and P as part of the data
     # Here: determine μ via the medians (e.g. we penalize differences away from the values that yield a uniform prior mean)
     μ = compute_μ(basis, T)
 

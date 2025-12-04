@@ -20,12 +20,13 @@ function sample_posterior(rng::AbstractRNG, bsm::BSMModel{T, A, NamedTuple{(:B, 
     # Prior Hyperparameters
     a_τ, b_τ, a_δ, b_δ = params(bsm)
 
-    # TODO store μ and P as part of bsm.data
     # Here: determine μ via the medians (e.g. we penalize differences away from the values that yield a uniform prior mean)
     μ = compute_μ(basis, T)
 
     # Set up penalty matrix:
     P = BandedMatrix((0=>fill(1, K-3), 1=>fill(-2, K-3), 2=>fill(1, K-3)), (K-3, K-1))
+
+    # Prior for β in this case is improper. Need difference matrix.
     
     β = Matrix{T}(undef, (K-1, n_samples))
     β[:,1] = copy(μ)

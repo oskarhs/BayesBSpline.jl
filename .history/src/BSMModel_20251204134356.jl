@@ -32,7 +32,7 @@ struct BSMModel{T<:Real, A<:AbstractBSplineBasis, NT<:NamedTuple}
     a_δ::T
     b_δ::T
     function BSMModel{T}(x::AbstractVector{<:Real}, basis::A; n_bins::Union{Nothing,<:Integer}=1000, bounds::Tuple{<:Real,<:Real}=get_default_bounds(x), a_τ::Real=1.0, b_τ::Real=1e-3, a_δ::Real=0.5, b_δ::Real=0.5) where {T<:Real, A<:AbstractBSplineBasis}
-        check_bsmkwargs(x, n_bins, bounds, a_τ, b_τ, a_δ, b_δ) # verify that supplied parameters make sense
+        check_bsmkwargs(n_bins, bounds, a_τ, b_τ, a_δ, b_δ) # verify that supplied parameters make sense
 
         T_a_τ = T(a_τ)
         T_b_τ = T(b_τ)
@@ -74,41 +74,19 @@ Distributions.params(bsm::B) where {B<:BSMModel} = (bsm.a_τ, bsm.b_τ, bsm.a_δ
 
 Base.eltype(::BSMModel{T,<:AbstractBSplineBasis, NT}) where {T<:Real, NT} = T
 
-# Print method for binned data
-function Base.show(io::IO, ::MIME"text/plain", bsm::BSMModel{T, A, NamedTuple{(:B, :b_ind, :bincounts, :n), Vals}}) where {T, A, Vals}
+function Base.show(io::IO, ::MIME"text/plain", bsm::BSMModel{T, A, NamedTuple{(:B, :b_ind, :bincounts, :n), D}}) where {T, A, D}
     n_bins = length(bsm.data.b_ind)
-    println(io, length(bsm), "-dimensional ", nameof(typeof(bsm)), '{', eltype(bsm), "}:")
-    println(io, "Using ", bsm.data.n, " binned observations on a regular grid consisting of ", n_bins, " bins.")
-    let io = IOContext(io, :compact => true, :limit => true)
-        println(io, " bounds: ", bsm.bounds)
-    end
-    print(io, " basis:  ")
+    println(io, length(bsm), "-dimensional ", nameof(typeof(bsm)), '{', eltype(bsm), '}', " with $(bsm.data.n) observations, binned using a regular grid of $(n_bins) bins:")
+    print(io, " basis: ")
     summary(io, basis(bsm))
-    println(io, "\n order:  ", order(bsm))
+    println(io, "\n order: ", order(bsm))
     let io = IOContext(io, :compact => true, :limit => true)
-        println(io, " knots:  ", knots(bsm))
+        println(io, " knots: ", knots(bsm))
     end
     nothing
 end
 
-# Print method for unbinned data
-function Base.show(io::IO, ::MIME"text/plain", bsm::BSMModel{T, A, NamedTuple{(:B, :b_ind, :n), Vals}}) where {T, A, Vals}
-    println(io, length(bsm), "-dimensional ", nameof(typeof(bsm)), '{', eltype(bsm), "}:")
-    println(io, "Using ", bsm.data.n, " unbinned observations.")
-    let io = IOContext(io, :compact => true, :limit => true)
-        println(io, " bounds: ", bsm.bounds)
-    end
-    print(io, " basis:  ")
-    summary(io, basis(bsm))
-    println(io, "\n order:  ", order(bsm))
-    let io = IOContext(io, :compact => true, :limit => true)
-        println(io, " knots:  ", knots(bsm))
-    end
-    nothing
-end
-
-Base.show(io::IO, bsm::BSMModel) = show(io, MIME("text/plain"), bsm)
-#Base.show(io::IO, bsm::BSMModel{T, A, NamedTuple{(:B, :b_ind,  :n), D}}) where {T, A, D} = show(io, MIME("text/plain"), bsm)
+Base.show(io::IO, bsm::BSMModel{T, A, NamedTuple{(:B, :b_ind, :bincounts, :n), D}}) where {T, A, D} = show(io, MIME("text/plain"), bsm)
 
 
 function get_default_splinedim(x::AbstractVector{<:Real})
@@ -122,7 +100,7 @@ function get_default_bounds(x::AbstractVector{<:Real})
     return xmin - 0.05*R, xmax + 0.05*R
 end
 
-function check_bsmkwargs(x::AbstractVector{<:Real}, n_bins::Union{Nothing,<:Integer}, bounds::Tuple{<:Real, <:Real}, a_τ::Real, b_τ::Real, a_δ::Real, b_δ::Real)
+function check_bsmkwargs(n_bins::Union{Nothing,<:Integer}, bounds::Tuple{<:Real, <:Real}, a_τ::Real, b_τ::Real, a_δ::Real, b_δ::Real)
     if !isnothing(n_bins) && n_bins ≤ 1
         throw(ArgumentError("Number of bins must be a positive integer or 'nothing'."))
     end

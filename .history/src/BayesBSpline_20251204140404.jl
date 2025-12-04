@@ -21,12 +21,11 @@ include("CubicSplineDist.jl")
 include("CubicSplineDensity.jl")
 include("fitCubicSplineDensity.jl")
 include("fitCubicSplineDist.jl")
-
 include("general_utils.jl")
 include("spline_utils.jl")
-include("BSMModel.jl")
 include("uniform_prior_mean.jl")
-include("gibbs.jl")
+include("gibbs_binned.jl")
+include("BSMModel.jl")
 
 
 end

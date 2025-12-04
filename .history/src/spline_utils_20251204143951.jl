@@ -81,7 +81,7 @@ function pointwise_quantiles(θ::AbstractMatrix{T}, basis::A, t::AbstractVector{
 end
 
 #NB! Upate to take spline basis as argument
-function create_spline_basis_matrix(x::AbstractVector{T}, basis::A) where {T<:Real, A<:AbstractBSplineBasis}
+function create_spline_basis_matrix(x::AbstractVector{T}, K::Int) where {T<:Real}
     basis = BSplineBasis(BSplineOrder(4), LinRange(0, 1, K-2))
     n = length(x)
     b_ind = Vector{Int}(undef, n)
@@ -97,6 +97,7 @@ function create_spline_basis_matrix(x::AbstractVector{T}, basis::A) where {T<:Re
 end
 
 function create_spline_basis_matrix_binned(x::AbstractVector{T}, basis::A, n_bins::Integer) where {T<:Real, A<:AbstractBSplineBasis}
+    # A total of 1000 bins should suffice
     K = length(basis)
     deg = order(basis) - 1
 

@@ -26,36 +26,26 @@ The prior distributions of the local and global smoothing parameters are given b
 struct BSMModel{T<:Real, A<:AbstractBSplineBasis, NT<:NamedTuple}
     data::NT
     basis::A
-    bounds::Tuple{T, T}
     a_τ::T
     b_τ::T
     a_δ::T
     b_δ::T
-    function BSMModel{T}(x::AbstractVector{<:Real}, basis::A; n_bins::Union{Nothing,<:Integer}=1000, bounds::Tuple{<:Real,<:Real}=get_default_bounds(x), a_τ::Real=1.0, b_τ::Real=1e-3, a_δ::Real=0.5, b_δ::Real=0.5) where {T<:Real, A<:AbstractBSplineBasis}
-        check_bsmkwargs(x, n_bins, bounds, a_τ, b_τ, a_δ, b_δ) # verify that supplied parameters make sense
-
-        T_a_τ = T(a_τ)
-        T_b_τ = T(b_τ)
-        T_a_δ = T(a_δ)
-        T_b_δ = T(b_δ)
-        T_x = T.(x)
-        T_bounds = (T(bounds[1]), T(bounds[2]))
-
-        # Normalize the data to the interval [0, 1]
-        z = @. (T_x - T_bounds[1]) / (T_bounds[2] - T_bounds[1])
-        
+    function BSMModel{T}(x::AbstractVector{<:Real}, basis::A; n_bins::Union{Nothing,<:Integer}=1000, a_τ::Real=1.0, b_τ::Real=1e-3, a_δ::Real=0.5, b_δ::Real=0.5, bounds::Tuple{<:Real, <:Real}) where {T<:Real, A<:AbstractBSplineBasis}
+        check_bsmkwargs(n_bins, a_τ, b_τ, a_δ, b_δ)
+        new_x = T.(x)
         n = length(x)
         if !isnothing(n_bins)
-            B, b_ind, bincounts = create_spline_basis_matrix_binned(z, basis, n_bins)
+            B, b_ind, bincounts = create_spline_basis_matrix_binned(new_x, basis, n_bins)
             data = (B = B, b_ind = b_ind, bincounts = bincounts, n = n)
         else
-            B, b_ind = create_spline_basis_matrix(z, basis)
+            B, b_ind = create_spline_basis_matrix(new_x, basis)
             data = (B = B, b_ind = b_ind, n = n)
         end
-        return new{T,A,typeof(data)}(data, basis, T_bounds, T_a_τ, T_b_τ, T_a_δ, T_b_δ)
+        return new{T,A,typeof(data)}(data, basis, T(a_τ), T(b_τ), T(a_δ), T(b_δ))
     end
 end
 
+BSMModel{T}(x::AbstractVector{<:Real}, basis::A; kwargs...) where {T<:Real, A<:AbstractBSplineBasis} = BSMModel{T}(x, basis; kwargs...)
 BSMModel{T}(x::AbstractVector{<:Real}, K::Integer; kwargs...) where {T<:Real} = BSMModel{T}(x, BSplineBasis(BSplineOrder(4), LinRange(0, 1, K-2)); kwargs...)
 BSMModel{T}(x::AbstractVector{<:Real}; kwargs...) where {T<:Real} = BSMModel{T}(x, get_default_splinedim(x); kwargs...)
 BSMModel(args...; kwargs...) = BSMModel{Float64}(args...; kwargs...)
@@ -74,41 +64,19 @@ Distributions.params(bsm::B) where {B<:BSMModel} = (bsm.a_τ, bsm.b_τ, bsm.a_δ
 
 Base.eltype(::BSMModel{T,<:AbstractBSplineBasis, NT}) where {T<:Real, NT} = T
 
-# Print method for binned data
-function Base.show(io::IO, ::MIME"text/plain", bsm::BSMModel{T, A, NamedTuple{(:B, :b_ind, :bincounts, :n), Vals}}) where {T, A, Vals}
+function Base.show(io::IO, ::MIME"text/plain", bsm::BSMModel{T, A, NamedTuple{(:B, :b_ind, :bincounts, :n), D}}) where {T, A, D}
     n_bins = length(bsm.data.b_ind)
-    println(io, length(bsm), "-dimensional ", nameof(typeof(bsm)), '{', eltype(bsm), "}:")
-    println(io, "Using ", bsm.data.n, " binned observations on a regular grid consisting of ", n_bins, " bins.")
-    let io = IOContext(io, :compact => true, :limit => true)
-        println(io, " bounds: ", bsm.bounds)
-    end
-    print(io, " basis:  ")
+    println(io, length(bsm), "-dimensional ", nameof(typeof(bsm)), '{', eltype(bsm), '}', " with $(bsm.data.n) observations, binned using a regular grid of $(n_bins) bins:")
+    print(io, " basis: ")
     summary(io, basis(bsm))
-    println(io, "\n order:  ", order(bsm))
+    println(io, "\n order: ", order(bsm))
     let io = IOContext(io, :compact => true, :limit => true)
-        println(io, " knots:  ", knots(bsm))
+        println(io, " knots: ", knots(bsm))
     end
     nothing
 end
 
-# Print method for unbinned data
-function Base.show(io::IO, ::MIME"text/plain", bsm::BSMModel{T, A, NamedTuple{(:B, :b_ind, :n), Vals}}) where {T, A, Vals}
-    println(io, length(bsm), "-dimensional ", nameof(typeof(bsm)), '{', eltype(bsm), "}:")
-    println(io, "Using ", bsm.data.n, " unbinned observations.")
-    let io = IOContext(io, :compact => true, :limit => true)
-        println(io, " bounds: ", bsm.bounds)
-    end
-    print(io, " basis:  ")
-    summary(io, basis(bsm))
-    println(io, "\n order:  ", order(bsm))
-    let io = IOContext(io, :compact => true, :limit => true)
-        println(io, " knots:  ", knots(bsm))
-    end
-    nothing
-end
-
-Base.show(io::IO, bsm::BSMModel) = show(io, MIME("text/plain"), bsm)
-#Base.show(io::IO, bsm::BSMModel{T, A, NamedTuple{(:B, :b_ind,  :n), D}}) where {T, A, D} = show(io, MIME("text/plain"), bsm)
+Base.show(io::IO, bsm::BSMModel{T, A, NamedTuple{(:B, :b_ind, :bincounts, :n), D}}) where {T, A, D} = show(io, MIME("text/plain"), bsm)
 
 
 function get_default_splinedim(x::AbstractVector{<:Real})
@@ -116,21 +84,9 @@ function get_default_splinedim(x::AbstractVector{<:Real})
     return max(min(200, ceil(Int, n/10)), 100)
 end
 
-function get_default_bounds(x::AbstractVector{<:Real})
-    xmin, xmax = extrema(x)
-    R = xmax - xmin
-    return xmin - 0.05*R, xmax + 0.05*R
-end
-
-function check_bsmkwargs(x::AbstractVector{<:Real}, n_bins::Union{Nothing,<:Integer}, bounds::Tuple{<:Real, <:Real}, a_τ::Real, b_τ::Real, a_δ::Real, b_δ::Real)
+function check_bsmkwargs(n_bins::Union{Nothing,<:Integer}, a_τ::Real, b_τ::Real, a_δ::Real, b_δ::Real)
     if !isnothing(n_bins) && n_bins ≤ 1
         throw(ArgumentError("Number of bins must be a positive integer or 'nothing'."))
-    end
-    xmin, xmax = extrema(x)
-    if bounds[1] ≥ bounds[2]
-        throw(ArgumentError("Supplied upper bound must be strictly greater than the lower bound."))
-    elseif bounds[1] > xmin || bounds[2] < xmax
-        throw(ArgumentError("Data is not contained within supplied bounds."))
     end
     hyperpar = [a_τ, b_τ, a_δ, b_δ]
     hyperpar_symb = [:a_τ, :b_τ, :a_δ, :b_δ]

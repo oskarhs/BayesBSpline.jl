@@ -90,9 +90,10 @@ function Base.show(io::IO, ::MIME"text/plain", bsm::BSMModel{T, A, NamedTuple{(:
     end
     nothing
 end
+#Base.show(io::IO, bsm::BSMModel{T, A, NamedTuple{(:B, :b_ind, :bincounts, :n), D}}) where {T, A, D} = show(io, MIME("text/plain"), bsm)
 
 # Print method for unbinned data
-function Base.show(io::IO, ::MIME"text/plain", bsm::BSMModel{T, A, NamedTuple{(:B, :b_ind, :n), Vals}}) where {T, A, Vals}
+function Base.show(io::IO, ::MIME"text/plain", bsm::BSMModel{T, A, NamedTuple{(:B, :b_ind, :n), D}}) where {T, A, D}
     println(io, length(bsm), "-dimensional ", nameof(typeof(bsm)), '{', eltype(bsm), "}:")
     println(io, "Using ", bsm.data.n, " unbinned observations.")
     let io = IOContext(io, :compact => true, :limit => true)
