@@ -1,5 +1,16 @@
 abstract type BayesianDensityModel end
 
+#= struct BayesianDensityModel{M, DataType}
+    model::M
+    data::DataType
+end
+
+function Base.show(io::IO, bdm::BayesianDensityModel)
+    println(io, "BayesianDensityModel of type ", nameof(typeof(bdm.model)))
+    println(io, bdm.model)
+    println(io, bdm.data)
+end
+ =#
 """
     BSMModel{A<:AbstractSplineBasis, T<:Real}
     
@@ -15,10 +26,10 @@ The prior distributions of the local and global smoothing parameters are given b
 * `basis`: The B-spline basis in the model.
 
 # Keyword arguments
-* `a_τ`: Shape hyperparameter for the global smoothing parameter τ².
-* `b_τ`: Rate hyperparameter for the global smoothing parameter τ².
-* `a_δ`: Shape hyperparameter for the local smoothing parameters δₖ².
-* `b_δ`: Rate hyperparameter for the local smoothing parameters δₖ².
+* `a_τ`: Prior shape hyperparameter for the global smoothing parameter τ².
+* `b_τ`: Prior rate hyperparameter for the global smoothing parameter τ².
+* `a_δ`: Prior shape hyperparameter for the local smoothing parameters.
+* `b_δ`: Prior rate hyperparameter for the local smoothing parameters.
 
 # Returns
 * `bsm`: A B-Spline mixture model object.
@@ -30,7 +41,7 @@ struct BSMModel{T<:Real, A<:AbstractBSplineBasis, NT<:NamedTuple}
     b_τ::T
     a_δ::T
     b_δ::T
-    function BSMModel{T,A}(x::AbstractVector{<:Real}, basis::A; n_bins::Union{Nothing,<:Integer}=1000, a_τ::Real=1.0, b_τ::Real=1e-3, a_δ::Real=0.5, b_δ::Real=0.5, bounds::Tuple{<:Real, <:Real}) where {T<:Real, A<:AbstractBSplineBasis}
+    function BSMModel{T,A}(x::AbstractVector{<:Real}, basis::A; n_bins::Union{Nothing,<:Integer}=1000, a_τ::Real=1, b_τ::Real=1e-3, a_δ::Real=0.5, b_δ::Real=0.5) where {T<:Real, A<:AbstractBSplineBasis}
         check_bsmkwargs(n_bins, a_τ, b_τ, a_δ, b_δ)
         new_x = T.(x)
         n = length(x)
@@ -47,7 +58,6 @@ end
 
 BSMModel{T}(x::AbstractVector{<:Real}, basis::A; kwargs...) where {T<:Real, A<:AbstractBSplineBasis} = BSMModel{T, A}(x, basis; kwargs...)
 BSMModel{T}(x::AbstractVector{<:Real}, K::Integer; kwargs...) where {T<:Real} = BSMModel{T}(x, BSplineBasis(BSplineOrder(4), LinRange(0, 1, K-2)); kwargs...)
-BSMModel{T}(x::AbstractVector{<:Real}; kwargs...) where {T<:Real} = BSMModel{T}(x, get_default_splinedim(x); kwargs...)
 BSMModel(args...; kwargs...) = BSMModel{Float64}(args...; kwargs...)
 
 BSplineKit.basis(bsm::B) where {B<:BSMModel} = bsm.basis
@@ -58,11 +68,11 @@ BSplineKit.knots(bsm::B) where {B<:BSMModel} = knots(bsm.basis)
 """
     params(bsm::BSMModel)
 
-Returns the hyperparameters of the B-Spline mixture model `bsm` as a tuple (a_τ, b_τ, a_δ, b_δ)
+Returns the hyperparameters of the B-Spline mixture model bsm as a tuple (a_τ, b_τ, a_δ, b_δ)
 """
 Distributions.params(bsm::B) where {B<:BSMModel} = (bsm.a_τ, bsm.b_τ, bsm.a_δ, bsm.b_δ)
 
-Base.eltype(::BSMModel{T,<:AbstractBSplineBasis, NT}) where {T<:Real, NT} = T
+Base.eltype(::BSMModel{T,<:AbstractBSplineBasis}) where {T<:Real} = T
 
 function Base.show(io::IO, ::MIME"text/plain", bsm::BSMModel{T, A, NamedTuple{(:B, :b_ind, :bincounts, :n), D}}) where {T, A, D}
     n_bins = length(bsm.data.b_ind)
@@ -73,6 +83,7 @@ function Base.show(io::IO, ::MIME"text/plain", bsm::BSMModel{T, A, NamedTuple{(:
     let io = IOContext(io, :compact => true, :limit => true)
         println(io, " knots: ", knots(bsm))
     end
+    println(io, "")
     nothing
 end
 
@@ -96,7 +107,21 @@ function check_bsmkwargs(n_bins::Union{Nothing,<:Integer}, a_τ::Real, b_τ::Rea
         end
     end
 end
+# Just set up basis matrices and similar
+# Also set up the support of the estimate...
+# Remember: rescale data to [0,1]!!!
+function (bsm::BSMModel)(x::AbstractVector{T}; nbins::Union{Nothing, <:Integer}=1000) where {T<:Real}
+    n = length(x)
+    if !isnothing(n_bins)
+        B, b_ind, bincounts = create_spline_basis_matrix_binned(x, basis)
+        data = (B = B, b_ind = b_ind, bincounts = bincounts, n = n)
+    else
+        B, b_ind = create_spline_basis_matrix(x, basis)
+        data = (B = B, b_ind = b_ind, n = n)
+    end
 
+    return BayesianDensityModel(bsm, data)
+end
 # Basically, we want this to return an object that we feed into sample/mfvb
 
 #= function StatsBase.sample(rng::AbstractRNG, bsm::BayesianDensityModel{M, NamedTuple{(:B, :b_ind, :bincounts), D}}, n_samp::Int) where {M<:BSMModel, D}

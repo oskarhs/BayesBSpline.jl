@@ -8,7 +8,7 @@ function create_spline_basis_matrix_binned(x::AbstractVector{T}, basis::A, n_bin
     K = length(basis)
     deg = order(basis) - 1
 
-    n_bins = (fld(n_bins, K-2)+1)*(K-2)-1 # Make the number of bins a multiple of K-2 so that at most 4 basis functions are nonzero at a time
+    n_bins = (fld(1000, K-2)+1)*(K-2)-1 # Make the number of bins a multiple of K-2 so that at most 4 basis functions are nonzero at a time
     bincounts = BayesBSpline.bin_regular(x, 0.0, 1.0, n_bins, true)
     binedges = LinRange(0, 1, n_bins+1)
     n = length(x)
