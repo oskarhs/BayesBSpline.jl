@@ -19,7 +19,7 @@ The BSMModel struct is used to generate quantities that are needed for the model
 * `bounds`: A tuple specifying the range of the `K`-dimensional B-spline basis. Defaults to [minimum(x) - 0.05*R, maximum(x) + 0.05*R] where `R` is the sample range. 
 
 # Keyword arguments
-* `n_bins`: Lower bound on the number of bins used when fitting the `BSMModel` to data. Binned fitting can be disabled by setting this equal to `nothing`. Defaults to `1000`.
+* `n_bins`: Lower bounds on the number of bins used when fitting the `BSMModel` to data. Binned fitting can be disabled by setting this equal to `nothing`. Defaults to `1000`.
 * `a_τ`: Shape hyperparameter for the global smoothing parameter τ².
 * `b_τ`: Rate hyperparameter for the global smoothing parameter τ².
 * `a_δ`: Shape hyperparameter for the local smoothing parameters δₖ².

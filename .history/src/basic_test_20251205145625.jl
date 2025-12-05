@@ -12,16 +12,15 @@ rng = Random.default_rng()
 #d_true = LogNormal()
 #d_true = Normal()
 #d_true = SymTriangularDist()
-#d_true = MixtureModel([Normal(0, 0.5), Normal(2, 0.1)], [0.4, 0.6])
+d_true = MixtureModel([Normal(0, 0.5), Normal(2, 0.1)], [0.4, 0.6])
 #d_true = MixtureModel(vcat(Normal(0, 1) ,[Normal(0.5*j, 0.1) for j in -2:2]), [0.5, 0.1, 0.1, 0.1, 0.1, 0.1])
-d_true = MixtureModel([Normal(harp_means[i], harp_sds[i]) for i in eachindex(harp_means)], fill(0.2, 5))
+#d_true = MixtureModel([Normal(harp_means[i], harp_sds[i]) for i in eachindex(means)], fill(0.2, 5))
 #d_true = Beta(1.2, 1.2)
 
-x = rand(rng, d_true, 1000)
+x = rand(rng, d_true, 250)
 
 #bsm = BayesBSpline.BSMModel(x, BSplineBasis(BSplineOrder(4), LinRange(minimum(x), maximum(x), 98)))
 bsm = BayesBSpline.BSMModel(x)
-
 #bsm2 = BayesBSpline.BSMModel(x, (0, 1))
 #bsm = BayesBSpline.BSMModel(x, 200, (0,1))
 #bsm = BayesBSpline.BSMModel(x; n_bins=nothing)
@@ -49,7 +48,7 @@ quants = quantile(bsmc, t, qs)
 low, med, up = (quants[:,i] for i in eachindex(qs))
 
 
-f_samp = BayesBSpline.evaluate_posterior_density(bsmc, t, [100, 200, 300, 400])
+f_samp = BayesBSpline.evaluate_posterior_splines(bsmc, t, [100, 200, 300, 400])
 p = plot()
 for i in axes(f_samp, 2)
     plot!(p, t, f_samp[:,i], color=:grey)

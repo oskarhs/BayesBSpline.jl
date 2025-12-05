@@ -68,13 +68,13 @@ end
 
 Compute the posterior quantiles of f(t) on the grid of `t` via Monte Carlo samples.
 
-The latter function returns a Matrix of dimension `(length(t), length(q))`, where each column corresponds to a given quantile.
+The latter function returns a Matrix of dimension `(length(t), length(q))`, where each column corresponds to each given quantile.
 """
 function Distributions.quantile(bsmc::BSMChains, t::AbstractVector{T}, q::T) where {T<:Real}
     if !(0 ≤ q ≤ 1)
         throws(DomainError("Requested quantile level is not in [0,1]."))
     end
-    f_samp = evaluate_posterior_density(bsmc, t)
+    f_samp = evaluate_posterior_splines(bsmc, t)
 
     return mapslices(x -> quantile(x, q), f_samp; dims=2)[:]
 end
@@ -83,7 +83,7 @@ function Distributions.quantile(bsmc::BSMChains, t::AbstractVector{T}, q::Abstra
     if !all(0 .≤ q .≤ 1)
         throw(DomainError("All requested quantile levels must lie in the interval [0,1]."))
     end
-    f_samp = evaluate_posterior_density(bsmc, t)
+    f_samp = evaluate_posterior_splines(bsmc, t)
     
     # Compute quantiles for each row (t point) across coef samples
     result = mapslices(x -> quantile(x, q), f_samp; dims=2)
@@ -91,11 +91,11 @@ function Distributions.quantile(bsmc::BSMChains, t::AbstractVector{T}, q::Abstra
 end
 
 """
-    evaluate_posterior_density(
+    evaluate_posterior_splines(
         bsmc::BSMChains, t::AbstractVector{<:Real}
     ) -> Matrix{<:Real}
 
-    evaluate_posterior_density(
+    evaluate_posterior_splines(
         bsmc::BSMChains, t::AbstractVector{<:Real}, samples_ind::AbstractVector{<:Integer}
     ) -> Matrix{<:Real}
 
@@ -109,7 +109,7 @@ Evaluate f(t | θ) on the grid `t` for (a subset of) the draws from the posterio
 # Returns
 * `f_samp`: Matrix of dimension `(length(t), length(samples_ind))`, where each column stores f(t) evaluated at a single posterior sample of θ.
 """
-function evaluate_posterior_density(bsmc::BSMChains, t::AbstractVector{T}) where {T<:Real}
+function evaluate_posterior_splines(bsmc::BSMChains, t::AbstractVector{T}) where {T<:Real}
     bs = basis(bsmc)
     B_sparse = create_unnormalized_sparse_spline_basis_matrix(t, bs)
     coefs = bsmc.samples.coef[:, bsmc.n_burnin+1:end]
@@ -117,7 +117,7 @@ function evaluate_posterior_density(bsmc::BSMChains, t::AbstractVector{T}) where
     return f_samp
 end
 
-function evaluate_posterior_density(bsmc::BSMChains, t::AbstractVector{T}, samples_ind::AbstractVector{<:Integer}) where {T<:Real}
+function evaluate_posterior_splines(bsmc::BSMChains, t::AbstractVector{T}, samples_ind::AbstractVector{<:Integer}) where {T<:Real}
     bs = basis(bsmc)
     B_sparse = create_unnormalized_sparse_spline_basis_matrix(t, bs)
     coefs = bsmc.samples.coef[:, bsmc.n_burnin+1:end][:, samples_ind]

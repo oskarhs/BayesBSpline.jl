@@ -19,7 +19,7 @@ The BSMModel struct is used to generate quantities that are needed for the model
 * `bounds`: A tuple specifying the range of the `K`-dimensional B-spline basis. Defaults to [minimum(x) - 0.05*R, maximum(x) + 0.05*R] where `R` is the sample range. 
 
 # Keyword arguments
-* `n_bins`: Lower bound on the number of bins used when fitting the `BSMModel` to data. Binned fitting can be disabled by setting this equal to `nothing`. Defaults to `1000`.
+* `n_bins`: Lower bounds on the number of bins used when fitting the `BSMModel` to data. Binned fitting can be disabled by setting this equal to `nothing`. Defaults to `1000`.
 * `a_τ`: Shape hyperparameter for the global smoothing parameter τ².
 * `b_τ`: Rate hyperparameter for the global smoothing parameter τ².
 * `a_δ`: Shape hyperparameter for the local smoothing parameters δₖ².
@@ -32,7 +32,7 @@ The BSMModel struct is used to generate quantities that are needed for the model
 
 ### Binned fitting
 To disable binned fitting, one can set the `n_bins=nothing`.
-Note that the binning is only used as part of the model fitting procedure, and the structure of the resulting fitted model object is the same regardless of whether the binning step is performed or not.
+Note that the binning is only used as part of the model fitting procedure, and the structure of the resulting model object is the same regardless of whether the binning step is performed or not.
 Empirically, the results obtained from running the binned and unbinned model fitting procedures tend to be very similar.
 We therefore recommend using the binned fitting procedure, due to the large improvements in model fitting speed, particularly for larger samples.
 
@@ -40,18 +40,12 @@ For computational reasons, the supplied number of bins is rounded up to the near
 This is done to ensure that at most 4 cubic splines have positive integrals over each bin.
 
 ### Hyperparameter selection
-The hyperparameters `τ2` and `δ2[k]` govern the smoothness of the B-spline mixture prior through the centered random walk prior on β | τ2, δ2:
-
-    β[k+2] = μ[k+2] + 2 {β[k+1] - μ[k+1]} - {β[k] - μ[k]} + τ * δ[k] * ϵ[k],
-
-where ϵ[k] is standard normal.
-
 The prior distributions of the local and global smoothing parameters are given by
 
     τ² ∼ InverseGamma(a_τ, b_τ)
     δₖ² ∼ InverseGamma(a_δ, b_δ),   1 ≤ k ≤ K-3.
 
-As noninformative defaults, we suggest using `a_τ = 1`, `b_τ = 1e-3`, `a_δ = 0.5`, `b_δ = 0.5`.
+As noninformative defaults, we reccomend using `a_τ = 1`, `b_τ = 1e-3`, `a_δ = 0.5`, `b_δ = 0.5`.
 To control the smoothness in the resulting density estimates, we recommend adjusting the value of `b_τ` while keeping the other hyperparameters fixed.
 Setting `b_τ` to a smaller value generally yields smoother curves.
 Similar priors for regression models suggest that values in the range [5e-5, 5e-3] are reasonable.
@@ -80,6 +74,9 @@ struct BSMModel{T<:Real, A<:AbstractBSplineBasis, NT<:NamedTuple}
         T_a_δ = T(a_δ)
         T_b_δ = T(b_δ)
         T_x = T.(x)
+
+        # Normalize the data to the interval [0, 1]
+        #z = @. (T_x - T_bounds[1]) / (T_bounds[2] - T_bounds[1])
         
         n = length(x)
         if !isnothing(n_bins)
@@ -106,10 +103,6 @@ end
 BSMModel{T}(x::AbstractVector{<:Real}, K::Integer=get_default_splinedim(x), bounds::Tuple{<:Real,<:Real}=get_default_bounds(x); kwargs...) where {T<:Real} = BSMModel{T}(x, BSplineBasis(BSplineOrder(4), LinRange(bounds[1], bounds[2], K-2)); kwargs...)
 BSMModel{T}(x::AbstractVector{<:Real}, bounds::Tuple{<:Real,<:Real}=get_default_bounds(x); kwargs...) where {T<:Real} = BSMModel{T}(x, get_default_splinedim(x), bounds; kwargs...)
 BSMModel(args...; kwargs...) = BSMModel{Float64}(args...; kwargs...)
-
-function Base.:(==)(bsm1::BSMModel, bsm2::BSMModel)
-    return basis(bsm1) == basis(bsm2) && bsm1.data == bsm2.data && params(bsm1) == params(bsm2)
-end
 
 BSplineKit.basis(bsm::B) where {B<:BSMModel} = bsm.basis
 BSplineKit.order(bsm::B) where {B<:BSMModel} = order(bsm.basis)
@@ -188,3 +181,12 @@ function check_bsmkwargs(x::AbstractVector{<:Real}, n_bins::Union{Nothing,<:Inte
         end
     end
 end
+
+# Basically, we want this to return an object that we feed into sample/mfvb
+
+#= function StatsBase.sample(rng::AbstractRNG, bsm::BayesianDensityModel{M, NamedTuple{(:B, :b_ind, :bincounts), D}}, n_samp::Int) where {M<:BSMModel, D}
+    println("Hello!")
+end
+function StatsBase.sample(bsm::BayesianDensityModel{M, NamedTuple{(:B, :b_ind, :bincounts), D}}, n_samp::Int) where {M<:BSMModel, D}
+    StatsBase.sample(Random.default_rng(), bsm, n_samp)
+end =#
