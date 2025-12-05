@@ -1,7 +1,7 @@
 abstract type BayesianDensityModel end
 
 """
-    BSMModel{T<:Real, A<:AbstractSplineBasis}
+    BSMModel{A<:AbstractSplineBasis, T<:Real}
     
 Struct representing a B-spline mixture model.
 
@@ -31,7 +31,7 @@ The BSMModel struct is used to generate quantities that are needed for the model
 # Extended help
 
 ### Binned fitting
-To disable binned fitting, one can set the `n_bins=nothing`.
+To disable binned fitting, one can set the `n_bins` keyword to `nothing`.
 Note that the binning is only used as part of the model fitting procedure, and the structure of the resulting model object is the same regardless of whether the binning step is performed or not.
 Empirically, the results obtained from running the binned and unbinned model fitting procedures tend to be very similar.
 We therefore recommend using the binned fitting procedure, due to the large improvements in model fitting speed, particularly for larger samples.
@@ -43,8 +43,7 @@ The prior distributions of the local and global smoothing parameters are given b
     δₖ² ∼ InverseGamma(a_δ, b_δ),   1 ≤ k ≤ K-3.
 
 As noninformative defaults, we reccomend using `a_τ = 1`, `b_τ = 1e-3`, `a_δ = 0.5`, `b_δ = 0.5`.
-To control the smoothness in the resulting density estimates, we recommend adjusting the value of `b_τ` while keeping the other hyperparameters fixed.
-Setting `b_τ` to a smaller value generally yields smoother curves.
+To control the smoothness in the resulting density estimates, we recommend adjusting the value of `b_τ`, with smaller values yielding smoother curves.
 Similar models for regression suggest that values in the range [5e-5, 5e-3] are reasonable.
 """
 struct BSMModel{T<:Real, A<:AbstractBSplineBasis, NT<:NamedTuple}
@@ -107,13 +106,13 @@ BSplineKit.length(bsm::B) where {B<:BSMModel} = length(bsm.basis)
 BSplineKit.knots(bsm::B) where {B<:BSMModel} = knots(bsm.basis)
 
 """
-    params(bsm::BSMModel) -> NTuple{4, <:Real}
+    params(bsm::BSMModel)
 
-Returns the hyperparameters of the B-Spline mixture model `bsm` as a tuple `(a_τ, b_τ, a_δ, b_δ)`.
+Returns the hyperparameters of the B-Spline mixture model `bsm` as a tuple (a_τ, b_τ, a_δ, b_δ)
 """
 Distributions.params(bsm::B) where {B<:BSMModel} = (bsm.a_τ, bsm.b_τ, bsm.a_δ, bsm.b_δ)
 
-Base.eltype(::BSMModel{T,<:AbstractBSplineBasis,<:NamedTuple}) where {T<:Real} = T
+Base.eltype(::BSMModel{T,<:AbstractBSplineBasis, NT}) where {T<:Real, NT} = T
 
 # Print method for binned data
 function Base.show(io::IO, ::MIME"text/plain", bsm::BSMModel{T, A, NamedTuple{(:log_B, :b_ind, :bincounts, :μ, :P, :n), Vals}}) where {T, A, Vals}

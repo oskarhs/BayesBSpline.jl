@@ -91,22 +91,24 @@ function create_spline_basis_matrix_binned(x::AbstractVector{T}, basis::A, n_bin
 end
 
 
-function create_unnormalized_sparse_spline_basis_matrix(x::AbstractVector{T}, basis::A) where {T<:Real, A<:AbstractBSplineBasis}
+function create_sparse_spline_basis_matrix(x::AbstractVector{T}, basis::A) where {T<:Real, A<:AbstractBSplineBasis}
     K = length(basis)
 
     n = length(x)
+    b_ind = Vector{Int}(undef, n)
+    B = Matrix{T}(undef, (n, 4))
+    norm_fac = BayesBSpline.compute_norm_fac(basis, T)
 
     I = Vector{Int}(undef, 4*n) # row indices
     J = Vector{Int}(undef, 4*n) # column indices
-    V = Vector{T}(undef, 4*n)
+    V = Vector{T}(undef, n)
     # Note: BSplineKit returns the evaluated spline functions in "reverse" order
     for i in eachindex(x)
         ind = (4*i-3):(4*i)
         j, basis_eval = basis(x[i])
         I[ind] .= i
         J[ind] .= (j-3):j
-        #V[ind] .= reverse(basis_eval) .* norm_fac[(j-3):j]
-        V[ind] .= reverse(basis_eval)
+        V[ind] .= reverse(basis_eval) .* norm_fac[b_ind[i]:b_ind[i]+3]
     end
     return sparse(I, J, V)
 end

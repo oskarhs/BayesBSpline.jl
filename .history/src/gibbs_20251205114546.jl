@@ -94,9 +94,8 @@ function sample_posterior(rng::AbstractRNG, bsm::BSMModel{T, A, NamedTuple{(:log
         τ2s[m] = τ2
         δ2s[:,m] = δ2
     end
-    coef = mapslices(θ -> theta_to_coef(θ, basis), θ; dims=1)
-    samples = (coef = coef, θ = θ, β = β, τ2 = τ2s, δ2 = δ2s)
-    return BSMChains(samples, basis, n_samples, n_burnin)
+
+    return θ[:, n_burnin+1:end], β[:, n_burnin+1:end], τ2s[n_burnin+1:end], δ2s[:, n_burnin+1:end]
 end
 
 
@@ -194,9 +193,8 @@ function sample_posterior(rng::AbstractRNG, bsm::BSMModel{T, A, NamedTuple{(:log
         τ2s[m] = τ2
         δ2s[:,m] = δ2
     end
-    coef = mapslices(θ -> theta_to_coef(θ, basis), θ; dims=1)
-    samples = (coef = coef, θ = θ, β = β, τ2 = τ2s, δ2 = δ2s)
-    return BSMChains(samples, basis, n_samples, n_burnin)
+
+    return θ, β, τ2s, δ2s
 end
 
 

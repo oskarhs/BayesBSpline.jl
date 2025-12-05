@@ -43,7 +43,7 @@ The prior distributions of the local and global smoothing parameters are given b
     δₖ² ∼ InverseGamma(a_δ, b_δ),   1 ≤ k ≤ K-3.
 
 As noninformative defaults, we reccomend using `a_τ = 1`, `b_τ = 1e-3`, `a_δ = 0.5`, `b_δ = 0.5`.
-To control the smoothness in the resulting density estimates, we recommend adjusting the value of `b_τ` while keeping the other hyperparameters fixed.
+To control the smoothness in the resulting density estimates, we recommend adjusting the value of `b_τ`.
 Setting `b_τ` to a smaller value generally yields smoother curves.
 Similar models for regression suggest that values in the range [5e-5, 5e-3] are reasonable.
 """
@@ -109,7 +109,7 @@ BSplineKit.knots(bsm::B) where {B<:BSMModel} = knots(bsm.basis)
 """
     params(bsm::BSMModel) -> NTuple{4, <:Real}
 
-Returns the hyperparameters of the B-Spline mixture model `bsm` as a tuple `(a_τ, b_τ, a_δ, b_δ)`.
+Returns the hyperparameters of the B-Spline mixture model `bsm` as a tuple (a_τ, b_τ, a_δ, b_δ)
 """
 Distributions.params(bsm::B) where {B<:BSMModel} = (bsm.a_τ, bsm.b_τ, bsm.a_δ, bsm.b_δ)
 

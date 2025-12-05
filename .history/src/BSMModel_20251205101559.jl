@@ -1,25 +1,27 @@
 abstract type BayesianDensityModel end
 
 """
-    BSMModel{T<:Real, A<:AbstractSplineBasis}
+    BSMModel{A<:AbstractSplineBasis, T<:Real}
     
 Struct representing a B-spline mixture model.
 
-The BSMModel struct is used to generate quantities that are needed for the model fitting procedure.
-
 # Constructors
     
-    BSMModel(x::AbstractVector{<:Real}, [K::Integer=get_default_splinedim(x)], [bounds::Tuple{<:Real,<:Real}=get_default_bounds(x)]; kwargs...) 
+    BSMModel(x::AbstractVector{<:Real}, K::Integer=get_default_splinedim(x), bounds::Tuple{<:Real,<:Real}=get_default_bounds(x); kwargs...) 
     BSMModel(x::AbstractVector{<:Real}, basis::AbstractBSplineBasis; kwargs...)
+
+The prior distributions of the local and global smoothing parameters are given by
+
+    τ² ∼ InverseGamma(a_τ, b_τ)
+    δₖ² ∼ InverseGamma(a_δ, b_δ),   1 ≤ k ≤ K-3.
 
 # Arguments
 * `x`: The data vector.
-* `basis`: The B-spline basis in the model. Defaults to a regular (augmented) spline basis covering [minimum(x) - 0.05*R, maximum(x) + 0.05*R] where `R` is the sample range. 
-* `K`: B-spline basis dimension of a regular augmented spline basis. Defaults to max(100, min(200, ⌈n/5⌉))
-* `bounds`: A tuple specifying the range of the `K`-dimensional B-spline basis. Defaults to [minimum(x) - 0.05*R, maximum(x) + 0.05*R] where `R` is the sample range. 
+* `basis`: The B-spline basis in the model. Defaults to a regular spline basis covering [minimum(x) - 0.05*R, maximum(x) + 0.05*R] where `R` is the sample range. 
+* `K`: B-spline basis dimension in case no . Defaults to 
+* `bounds`: A tuple specifying the of the `K`-dimensional B-spline basis.
 
 # Keyword arguments
-* `n_bins`: Number of bins used when fitting the `BSMModel` to data. Binned fitting can be disabled by setting this equal to `nothing`. Defaults to `1000`.
 * `a_τ`: Shape hyperparameter for the global smoothing parameter τ².
 * `b_τ`: Rate hyperparameter for the global smoothing parameter τ².
 * `a_δ`: Shape hyperparameter for the local smoothing parameters δₖ².
@@ -27,25 +29,6 @@ The BSMModel struct is used to generate quantities that are needed for the model
 
 # Returns
 * `bsm`: A B-Spline mixture model object.
-
-# Extended help
-
-### Binned fitting
-To disable binned fitting, one can set the `n_bins=nothing`.
-Note that the binning is only used as part of the model fitting procedure, and the structure of the resulting model object is the same regardless of whether the binning step is performed or not.
-Empirically, the results obtained from running the binned and unbinned model fitting procedures tend to be very similar.
-We therefore recommend using the binned fitting procedure, due to the large improvements in model fitting speed, particularly for larger samples.
-
-### Hyperparameter selection
-The prior distributions of the local and global smoothing parameters are given by
-
-    τ² ∼ InverseGamma(a_τ, b_τ)
-    δₖ² ∼ InverseGamma(a_δ, b_δ),   1 ≤ k ≤ K-3.
-
-As noninformative defaults, we reccomend using `a_τ = 1`, `b_τ = 1e-3`, `a_δ = 0.5`, `b_δ = 0.5`.
-To control the smoothness in the resulting density estimates, we recommend adjusting the value of `b_τ` while keeping the other hyperparameters fixed.
-Setting `b_τ` to a smaller value generally yields smoother curves.
-Similar models for regression suggest that values in the range [5e-5, 5e-3] are reasonable.
 """
 struct BSMModel{T<:Real, A<:AbstractBSplineBasis, NT<:NamedTuple}
     data::NT
@@ -97,8 +80,8 @@ struct BSMModel{T<:Real, A<:AbstractBSplineBasis, NT<:NamedTuple}
         return new{T,A,typeof(data)}(data, basis, T_a_τ, T_b_τ, T_a_δ, T_b_δ)
     end
 end
+
 BSMModel{T}(x::AbstractVector{<:Real}, K::Integer=get_default_splinedim(x), bounds::Tuple{<:Real,<:Real}=get_default_bounds(x); kwargs...) where {T<:Real} = BSMModel{T}(x, BSplineBasis(BSplineOrder(4), LinRange(bounds[1], bounds[2], K-2)); kwargs...)
-BSMModel{T}(x::AbstractVector{<:Real}, bounds::Tuple{<:Real,<:Real}=get_default_bounds(x); kwargs...) where {T<:Real} = BSMModel{T}(x, get_default_splinedim(x), bounds; kwargs...)
 BSMModel(args...; kwargs...) = BSMModel{Float64}(args...; kwargs...)
 
 BSplineKit.basis(bsm::B) where {B<:BSMModel} = bsm.basis
@@ -107,13 +90,13 @@ BSplineKit.length(bsm::B) where {B<:BSMModel} = length(bsm.basis)
 BSplineKit.knots(bsm::B) where {B<:BSMModel} = knots(bsm.basis)
 
 """
-    params(bsm::BSMModel) -> NTuple{4, <:Real}
+    params(bsm::BSMModel)
 
-Returns the hyperparameters of the B-Spline mixture model `bsm` as a tuple `(a_τ, b_τ, a_δ, b_δ)`.
+Returns the hyperparameters of the B-Spline mixture model `bsm` as a tuple (a_τ, b_τ, a_δ, b_δ)
 """
 Distributions.params(bsm::B) where {B<:BSMModel} = (bsm.a_τ, bsm.b_τ, bsm.a_δ, bsm.b_δ)
 
-Base.eltype(::BSMModel{T,<:AbstractBSplineBasis,<:NamedTuple}) where {T<:Real} = T
+Base.eltype(::BSMModel{T,<:AbstractBSplineBasis, NT}) where {T<:Real, NT} = T
 
 # Print method for binned data
 function Base.show(io::IO, ::MIME"text/plain", bsm::BSMModel{T, A, NamedTuple{(:log_B, :b_ind, :bincounts, :μ, :P, :n), Vals}}) where {T, A, Vals}

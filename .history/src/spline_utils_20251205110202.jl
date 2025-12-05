@@ -40,14 +40,56 @@ function compute_μ(basis::A, T::Type{<:Real}=Float64) where {A<:AbstractBSpline
     return μ
 end
 
+"""
+    pointwise_quantiles(θ::AbstractMatrix{T}, basis::A, t::AbstractVector{T}, q::T) where {T<:Real, A<:AbstractBSplineBasis}
+    pointwise_quantiles(θ::AbstractMatrix{T}, basis::A, t::AbstractVector{T}, q::AbstractVector{T}) where {T<:Real, A<:AbstractBSplineBasis}
+
+Compute the posterior quantiles of f(t) over a grid of t-values.
+
+The latter function returns a Matrix of dimension (length(t), length(q))
+"""
+function pointwise_quantiles end
+
+function pointwise_quantiles(θ::AbstractMatrix{T}, basis::A, t::AbstractVector{T}, q::T) where {T<:Real, A<:AbstractBSplineBasis}
+    if !(0 ≤ q ≤ 1)
+        throws(DomainError("Requested quantile level is not in [0,1]."))
+    end
+    S_samp = Matrix{T}(undef, (length(t), size(θ, 2)))
+    for i in axes(θ, 2)
+        S_samp[:,i] = Spline(basis, BayesBSpline.theta_to_coef(θ[:,i], basis)).(t)
+    end
+    #return [quantile(S_samp[j,:], q) for j in eachindex(t)]
+    return mapslices(x -> quantile(x, q), S_samp; dims=2)[:]
+end
+
+function pointwise_quantiles(θ::AbstractMatrix{T}, basis::A, t::AbstractVector{T}, q::AbstractVector{T}) where {T<:Real, A<:AbstractBSplineBasis}
+    if !all(0 .≤ q .≤ 1)
+        throw(DomainError("All requested quantile levels must lie in the interval [0,1]."))
+    end
+    
+    n_t = length(t)
+    n_samples = size(θ, 2)
+    S_samp = Matrix{T}(undef, n_t, n_samples)
+    
+    for i in axes(θ, 2)
+        S = Spline(basis, BayesBSpline.theta_to_coef(θ[:,i], basis))
+        S_samp[:,i] .= S.(t)  # evaluate spline at all t points
+    end
+    
+    # Compute quantiles for each row (t point) across θ samples
+    result = mapslices(x -> quantile(x, q), S_samp; dims=2)
+    return result  # shape: (length(t), length(q))
+end
+
 #NB! Upate to take spline basis as argument
 function create_spline_basis_matrix(x::AbstractVector{T}, basis::A) where {T<:Real, A<:AbstractBSplineBasis}
     K = length(basis)
 
+    basis = BSplineBasis(BSplineOrder(4), LinRange(0, 1, K-2))
     n = length(x)
     b_ind = Vector{Int}(undef, n)
     B = Matrix{T}(undef, (n, 4))
-    norm_fac = BayesBSpline.compute_norm_fac(basis, T)
+    norm_fac = BayesBSpline.compute_norm_fac(K)[1:K, end]
     # Note: BSplineKit returns the evaluated spline functions in "reverse" order
     for i in eachindex(x)
         j, basis_eval = basis(x[i])
@@ -88,25 +130,4 @@ function create_spline_basis_matrix_binned(x::AbstractVector{T}, basis::A, n_bin
         end
     end
     return B, b_ind, bincounts
-end
-
-
-function create_unnormalized_sparse_spline_basis_matrix(x::AbstractVector{T}, basis::A) where {T<:Real, A<:AbstractBSplineBasis}
-    K = length(basis)
-
-    n = length(x)
-
-    I = Vector{Int}(undef, 4*n) # row indices
-    J = Vector{Int}(undef, 4*n) # column indices
-    V = Vector{T}(undef, 4*n)
-    # Note: BSplineKit returns the evaluated spline functions in "reverse" order
-    for i in eachindex(x)
-        ind = (4*i-3):(4*i)
-        j, basis_eval = basis(x[i])
-        I[ind] .= i
-        J[ind] .= (j-3):j
-        #V[ind] .= reverse(basis_eval) .* norm_fac[(j-3):j]
-        V[ind] .= reverse(basis_eval)
-    end
-    return sparse(I, J, V)
 end

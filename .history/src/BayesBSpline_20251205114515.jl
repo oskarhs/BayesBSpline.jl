@@ -3,7 +3,7 @@ module BayesBSpline
 using BSplineKit
 export BSplineKit
 
-using Random, Distributions, Base.Threads, Optim, StatsBase, BandedMatrices, PolyaGammaHybridSamplers, LinearAlgebra, SparseArrays
+using Random, Distributions, Base.Threads, Optim, StatsBase, BandedMatrices, PolyaGammaHybridSamplers, LinearAlgebra
 #using Plots
 
 import Distributions: mean, quantile, ContinuousUnivariateDistribution
@@ -24,9 +24,9 @@ include("fitCubicSplineDist.jl")
 
 include("general_utils.jl")
 include("spline_utils.jl")
-include("BSMChains.jl")
 include("BSMModel.jl")
 include("uniform_prior_mean.jl")
+include("BSMChains.jl")
 include("gibbs.jl")
 
 

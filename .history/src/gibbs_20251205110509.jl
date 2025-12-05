@@ -47,7 +47,7 @@ function sample_posterior(rng::AbstractRNG, bsm::BSMModel{T, A, NamedTuple{(:log
 
         # Update z (N and S)
         N = zeros(Int, K)               # class label counts (of z[i]'s)
-        for i in 1:n_bins
+        for i in 1:n
             # Compute the four nonzero probabilities:
             k0 = b_ind[i]
             for l in 1:4
@@ -63,7 +63,7 @@ function sample_posterior(rng::AbstractRNG, bsm::BSMModel{T, A, NamedTuple{(:log
                 logprobs[l] = log_B[i,l] + log_θ[k,m-1] 
             end
             probs = BayesBSpline.softmax(logprobs)
-            counts = rand(rng, Multinomial(bincounts[i], probs))
+            counts = rand(rng, Multinomial(1, probs))
             N[k0:k0+3] .+= counts
         end
         # Update ω
@@ -94,9 +94,8 @@ function sample_posterior(rng::AbstractRNG, bsm::BSMModel{T, A, NamedTuple{(:log
         τ2s[m] = τ2
         δ2s[:,m] = δ2
     end
-    coef = mapslices(θ -> theta_to_coef(θ, basis), θ; dims=1)
-    samples = (coef = coef, θ = θ, β = β, τ2 = τ2s, δ2 = δ2s)
-    return BSMChains(samples, basis, n_samples, n_burnin)
+
+    return θ[:, n_burnin+1:end], β[:, n_burnin+1:end], τ2s[n_burnin+1:end], δ2s[:, n_burnin+1:end]
 end
 
 
@@ -147,7 +146,7 @@ function sample_posterior(rng::AbstractRNG, bsm::BSMModel{T, A, NamedTuple{(:log
 
         # Update z (N and S)
         N = zeros(Int, K)               # class label counts (of z[i]'s)
-        for i in 1:n
+        for i in 1:n_bins
             # Compute the four nonzero probabilities:
             k0 = b_ind[i]
             for l in 1:4
@@ -163,7 +162,7 @@ function sample_posterior(rng::AbstractRNG, bsm::BSMModel{T, A, NamedTuple{(:log
                 logprobs[l] = log_B[i,l] + log_θ[k,m-1] 
             end
             probs = BayesBSpline.softmax(logprobs)
-            counts = rand(rng, Multinomial(1, probs))
+            counts = rand(rng, Multinomial(bincounts[i], probs))
             N[k0:k0+3] .+= counts
         end
         # Update ω
@@ -194,9 +193,8 @@ function sample_posterior(rng::AbstractRNG, bsm::BSMModel{T, A, NamedTuple{(:log
         τ2s[m] = τ2
         δ2s[:,m] = δ2
     end
-    coef = mapslices(θ -> theta_to_coef(θ, basis), θ; dims=1)
-    samples = (coef = coef, θ = θ, β = β, τ2 = τ2s, δ2 = δ2s)
-    return BSMChains(samples, basis, n_samples, n_burnin)
+
+    return θ[:, n_burnin+1:end], β[:, n_burnin+1:end], τ2s[n_burnin+1:end], δ2s[:, n_burnin+1:end]
 end
 
 
@@ -325,7 +323,7 @@ function sample_posterior(rng::Random.AbstractRNG, x::AbstractVector{T}, M::Int)
 end
 
 # This should return a 
-function StatsBase.sample(rng::AbstractRNG, bsm::BSMModel, n_samples::Integer; n_burnin::Integer=min(div(n_samples, 10), 1_000))
+function StatsBase.sample(rng::AbstractRNG, bsm::BSMModel, n_samples::Integer, n_burnin::Integer)
 end
 
 #= 

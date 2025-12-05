@@ -1,8 +1,20 @@
+#= using Random, Statistics
+using ForwardDiff, BandedMatrices
+using LinearAlgebra, Distributions, BSplineKit, Plots, Optim
+using PolyaGammaHybridSamplers, Memoization, PosteriorStats
+
+include(joinpath(@__DIR__, "BayesBSpline.jl"))
+using .BayesBSpline
+ =#
+# Evaluate basis functions for all observations:
+# Remember to normalize:
+
+
 # To do: make a multithreaded version (also one for unbinned data)
-function sample_posterior(rng::AbstractRNG, bsm::BSMModel{T, A, NamedTuple{(:log_B, :b_ind, :bincounts, :μ, :P, :n), Vals}}, n_samples::Integer, n_burnin::Integer) where {T, A, Vals}
+function sample_posterior(rng::AbstractRNG, bsm::BSMModel{T, A, NamedTuple{(:log_B, :b_ind, :bincounts, :n), Vals}}, n_samples::Integer, n_burnin::Integer) where {T, A, Vals}
     basis = BSplineKit.basis(bsm)
     K = length(basis)
-    (; log_B, b_ind, bincounts, μ, P, n) = bsm.data
+    (; log_B, b_ind, bincounts, n) = bsm.data
     n_bins = length(bincounts)
 
     # Prior Hyperparameters
@@ -94,109 +106,8 @@ function sample_posterior(rng::AbstractRNG, bsm::BSMModel{T, A, NamedTuple{(:log
         τ2s[m] = τ2
         δ2s[:,m] = δ2
     end
-    coef = mapslices(θ -> theta_to_coef(θ, basis), θ; dims=1)
-    samples = (coef = coef, θ = θ, β = β, τ2 = τ2s, δ2 = δ2s)
-    return BSMChains(samples, basis, n_samples, n_burnin)
-end
 
-
-function sample_posterior(rng::AbstractRNG, bsm::BSMModel{T, A, NamedTuple{(:log_B, :b_ind, :μ, :P, :n), Vals}}, n_samples::Integer, n_burnin::Integer) where {T, A, Vals}
-    basis = BSplineKit.basis(bsm)
-    K = length(basis)
-    (; log_B, b_ind, μ, P, n) = bsm.data
-
-    # Prior Hyperparameters
-    a_τ, b_τ, a_δ, b_δ = params(bsm)
-    
-    # Store draws
-    β = Matrix{T}(undef, (K-1, n_samples))
-    β[:,1] = copy(μ)
-    τ2 = one(T)                # Global smoothing parameter
-    δ2 = Vector{T}(undef, K-3) # Local smoothing parameters
-    ω = Vector{T}(undef, K-1)  # PolyaGamma variables
-
-    logprobs = Vector{T}(undef, 4)  # class label probabilities
-
-    θ = Matrix{T}(undef, (K, n_samples)) # Mixture probabilities
-    θ[:, 1] = max.(eps(), BayesBSpline.stickbreaking(β[:, 1]))
-    θ[:, 1] = θ[:, 1] / sum(θ[:, 1])
-    log_θ = similar(θ)
-    log_θ[:, 1] = log.(θ[:,1])
-    τ2s = Vector{T}(undef, n_samples)
-    τ2s[1] = τ2
-    δ2s = Matrix{T}(undef, (K-3, n_samples))
-
-    for m in 2:n_samples
-
-        # Update δ2: (some inefficiencies here, but okay for now)
-        for k in 1:K-3
-            a_δ_k_new = a_δ + T(0.5)
-            b_δ_k_new = b_δ + T(0.5) * abs2( β[k+2,m-1] -  μ[k+2] - ( 2*(β[k+1,m-1] - μ[k+1]) - (β[k,m-1] - μ[k]) )) / τ2
-            δ2[k] = rand(rng, InverseGamma(a_δ_k_new, b_δ_k_new))
-            #δ2[k] = 1.0
-        end
-
-        # Update τ2
-        a_τ_new = a_τ + T(0.5) * (K - 3)
-        b_τ_new = b_τ
-        for k in 1:K-3
-            b_τ_new += T(0.5) * abs2( β[k+2,m-1] -  μ[k+2] - ( 2*(β[k+1,m-1] - μ[k+1]) - (β[k,m-1] - μ[k]) )) / δ2[k]
-        end
-        τ2 = rand(rng, InverseGamma(a_τ_new, b_τ_new))
-        #τ2 = 0.01
-
-        # Update z (N and S)
-        N = zeros(Int, K)               # class label counts (of z[i]'s)
-        for i in 1:n
-            # Compute the four nonzero probabilities:
-            k0 = b_ind[i]
-            for l in 1:4
-                k = k0 + l - 1
-                #= if k != K
-                    #sumterm = sum(@. -log(cosh(T(0.5)*β[1:k, m-1])) - T(0.5) * β[1:k, m-1] - log(T(2)))
-                    sumterm = sum(@. -log(cosh(T(0.5)*β[k0+1:k, m-1])) - T(0.5) * β[k0+1:k, m-1] - log(T(2)))
-                    logprobs[l] = log_B[i, l] + β[k, m-1] + sumterm
-                else
-                    sumterm = sum(@. -log(cosh(T(0.5)*β[k0+1:K-1, m-1])) - T(0.5) * β[k0+1:K-1, m-1] - log(T(2)))
-                    logprobs[l] = log_B[i, l] + sumterm
-                end =#
-                logprobs[l] = log_B[i,l] + log_θ[k,m-1] 
-            end
-            probs = BayesBSpline.softmax(logprobs)
-            counts = rand(rng, Multinomial(1, probs))
-            N[k0:k0+3] .+= counts
-        end
-        # Update ω
-        # Compute N and S
-        S = n .- cumsum(vcat(0, N[1:K-1]))
-        for k in 1:K-1
-            c_k_new = S[k]
-            d_k_new = β[k, m-1]
-            ω[k] = rand(rng, PolyaGammaHybridSampler(c_k_new, d_k_new))
-        end
-
-        # Update β
-        # Compute the Q matrix
-        D = Diagonal(1 ./(τ2*δ2))
-        Q = transpose(P) * D * P
-        # Compute the Ω matrix (Note: Q + D retains the banded structure!)
-        Ω = Diagonal(ω)
-        inv_Σ_new = Ω + Q
-        # Compute inv(Σ_new) * μ_new
-        canon_mean_new = Q * μ + (N[1:K-1] - S[1:K-1]/2)
-        # Sample β
-        β[:, m] = rand(rng, MvNormalCanon(canon_mean_new, inv_Σ_new))
-
-        # Record θ
-        θ[:, m] = max.(eps(), BayesBSpline.stickbreaking(β[:, m]))
-        θ[:, m] = θ[:, m] / sum(θ[:, m])
-        log_θ[:, m] = log.(θ[:,m])
-        τ2s[m] = τ2
-        δ2s[:,m] = δ2
-    end
-    coef = mapslices(θ -> theta_to_coef(θ, basis), θ; dims=1)
-    samples = (coef = coef, θ = θ, β = β, τ2 = τ2s, δ2 = δ2s)
-    return BSMChains(samples, basis, n_samples, n_burnin)
+    return θ[:, n_burnin+1:end], β[:, n_burnin+1:end], τ2s[n_burnin+1:end], δ2s[:, n_burnin+1:end]
 end
 
 
@@ -324,9 +235,6 @@ function sample_posterior(rng::Random.AbstractRNG, x::AbstractVector{T}, M::Int)
     return θ
 end
 
-# This should return a 
-function StatsBase.sample(rng::AbstractRNG, bsm::BSMModel, n_samples::Integer; n_burnin::Integer=min(div(n_samples, 10), 1_000))
-end
 
 #= 
 K = 50

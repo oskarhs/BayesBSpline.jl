@@ -109,7 +109,7 @@ BSplineKit.knots(bsm::B) where {B<:BSMModel} = knots(bsm.basis)
 """
     params(bsm::BSMModel) -> NTuple{4, <:Real}
 
-Returns the hyperparameters of the B-Spline mixture model `bsm` as a tuple `(a_τ, b_τ, a_δ, b_δ)`.
+Returns the hyperparameters of the B-Spline mixture model `bsm` as a tuple (a_τ, b_τ, a_δ, b_δ)
 """
 Distributions.params(bsm::B) where {B<:BSMModel} = (bsm.a_τ, bsm.b_τ, bsm.a_δ, bsm.b_δ)
 
