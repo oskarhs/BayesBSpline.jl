@@ -117,9 +117,16 @@ end
 # Create the k'th unit vector in the canonical basis for R^K.
 function unitvector(K::Int, k::Int, T)
     if !(1 ≤ k ≤ K)
-        throw(ArgumentError("Index out of range."))
+        throw(ArgumentError(""))
     end
     unitvec = zeros(T, K)
     unitvec[k] = 1
     return unitvec
 end
+
+bs_est = BSplineBasis(BSplineOrder(4), LinRange(-3/K, 1+3/K, K+4), augment=Val(false))
+
+bmin, bmax = boundaries(bs_est);
+S = integral(Spline(bs_est, BayesBSpline.unitvector(96, 1, Float64)));
+S(1.0)
+1/(S(bmax) - S(bmin))

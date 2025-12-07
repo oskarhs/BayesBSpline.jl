@@ -87,10 +87,9 @@ end =#
 function compute_norm_fac(basis::A, T=Float64) where {A<:AbstractBSplineBasis}
     K = length(basis)
     norm_fac = Vector{T}(undef, K)
-    bmin::T, bmax::T = 0, 1
     for k in 1:K
         S = integral(Spline(basis, BayesBSpline.unitvector(K, k, T)))
-        norm_fac[k] = 1/(S(bmax) - S(bmin))
+        norm_fac[k] = 1/(S(one(T)) - S(zero(T)))
     end
     return norm_fac
 end
@@ -117,7 +116,7 @@ end
 # Create the k'th unit vector in the canonical basis for R^K.
 function unitvector(K::Int, k::Int, T)
     if !(1 ≤ k ≤ K)
-        throw(ArgumentError("Index out of range."))
+        throw(ArgumentError(""))
     end
     unitvec = zeros(T, K)
     unitvec[k] = 1

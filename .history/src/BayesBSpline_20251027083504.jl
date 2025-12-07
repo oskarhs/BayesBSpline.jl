@@ -3,7 +3,7 @@ module BayesBSpline
 using BSplineKit
 export BSplineKit
 
-using Random, Distributions, Base.Threads, Optim
+using Random, Distributions, Base.Threads
 #using Plots
 
 import Distributions: mean, quantile, ContinuousUnivariateDistribution
@@ -15,12 +15,11 @@ import SpecialFunctions: loggamma, digamma
 export CubicSplineDist, mean, fit!, quantile, rand
 export CubicSplineDensity, eval_density, fit, weights, fit_turbo
 
+include("spline_utils.jl")
 include("CubicSplineDist.jl")
 include("CubicSplineDensity.jl")
 include("fitCubicSplineDensity.jl")
 include("fitCubicSplineDist.jl")
-include("spline_utils.jl")
-include("uniform_prior_mean.jl")
 
 
 end

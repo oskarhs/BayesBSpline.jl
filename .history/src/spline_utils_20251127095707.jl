@@ -35,8 +35,26 @@ function stickbreaking(β::AbstractVector{T}) where {T<:Real}
 end
 
 # Find the mixture weights corresponding to given coefficients in the unnormalized b-spline basis
-function coef_to_theta(coef::AbstractVector{T}, basis::A) where {T<:Real, A<:AbstractBSplineBasis}
-    θ = coef ./ compute_norm_fac(basis, T)
+function coef_to_theta(coef::AbstractVector{T}) where {T<:Real}
+    K = length(coef)
+    θ = Vector{T}(undef, K)
+    if K == 4
+        θ = 0.25*coef
+    elseif K == 5
+        θ[1] = 0.125*coef[1]
+        θ[2:K-1] = 0.25*coef[2:K-1]
+        θ[K] = 0.125*coef[K]
+    else
+        for j = 1:3
+            θ[j] = coef[j]*j/(4.0*(K-3.0))
+        end
+        for j = 4:K-3
+            θ[j] = coef[j]*1.0/(K-3.0)
+        end
+        for j = K-2:K
+            θ[j] = coef[j]*(K-j + 1.0)/(4.0*(K-3.0))
+        end
+    end
     return θ
 end
 
@@ -87,10 +105,9 @@ end =#
 function compute_norm_fac(basis::A, T=Float64) where {A<:AbstractBSplineBasis}
     K = length(basis)
     norm_fac = Vector{T}(undef, K)
-    bmin::T, bmax::T = 0, 1
     for k in 1:K
         S = integral(Spline(basis, BayesBSpline.unitvector(K, k, T)))
-        norm_fac[k] = 1/(S(bmax) - S(bmin))
+        norm_fac[k] = 1/(S(one(T)) - S(zero(T)))
     end
     return norm_fac
 end
@@ -117,7 +134,7 @@ end
 # Create the k'th unit vector in the canonical basis for R^K.
 function unitvector(K::Int, k::Int, T)
     if !(1 ≤ k ≤ K)
-        throw(ArgumentError("Index out of range."))
+        throw(ArgumentError(""))
     end
     unitvec = zeros(T, K)
     unitvec[k] = 1
