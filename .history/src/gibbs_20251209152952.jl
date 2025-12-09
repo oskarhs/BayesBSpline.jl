@@ -187,13 +187,15 @@ function sample_posterior(rng::AbstractRNG, bsm::BSMModel{T, A, NamedTuple{(:log
         β[:, m] = rand(rng, MvNormalCanon(canon_mean_new, inv_Σ_new))
 
         # Record θ
-        θ = max.(eps(), BayesBSpline.stickbreaking(β))
-        θ = θ / sum(θ)
-        log_θ = log.(θ)
-        
+        θ[:, m] = max.(eps(), BayesBSpline.stickbreaking(β[:, m]))
+        θ[:, m] = θ[:, m] / sum(θ[:, m])
+        log_θ[:, m] = log.(θ[:,m])
+        τ2s[m] = τ2
+        δ2s[:,m] = δ2
+
         # Compute coefficients in terms of unnormalized B-spline basis
-        spline_coefs = theta_to_coef(θ, basis)
-        samples[m] = (spline_coefs = spline_coefs, θ = θ, β = β, τ2 = τ2, δ2 = δ2)
+        spline_coefs = theta_to_coef(θ[:,m], basis)
+        samples[m] = (spline_coefs = spline_coefs, θ = θ[:,m], β = β[:,m], τ2 = τ2, δ2 = δ2)
     end
     return BSMChains(samples, basis, n_samples, n_burnin)
 end

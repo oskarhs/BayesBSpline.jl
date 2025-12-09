@@ -13,9 +13,9 @@ rng = Random.default_rng()
 #d_true = Normal()
 #d_true = SymTriangularDist()
 #d_true = MixtureModel([Normal(0, 0.5), Normal(2, 0.1)], [0.4, 0.6])
-#d_true = MixtureModel([Normal(0, 1), Normal(0, 0.1)], [2/3, 1/3])
+d_true = MixtureModel([Normal(0, 1), Normal(0, 0.1)], [2/3, 1/3])
 #d_true = MixtureModel(vcat(Normal(0, 1) ,[Normal(0.5*j, 0.1) for j in -2:2]), [0.5, 0.1, 0.1, 0.1, 0.1, 0.1])
-d_true = MixtureModel([Normal(harp_means[i], harp_sds[i]) for i in eachindex(harp_means)], fill(0.2, 5))
+#d_true = MixtureModel([Normal(harp_means[i], harp_sds[i]) for i in eachindex(harp_means)], fill(0.2, 5))
 #d_true = Beta(1.2, 1.2)
 
 x = rand(rng, d_true, 1000)
@@ -60,5 +60,5 @@ Plots.plot!(p, t, med, color=:blue, lw=1.2, label="Posterior median")
 
 Plots.plot!(kdest.x, kdest.density, color=:grey, label="KDE", lw=1.2)
 Plots.plot!(p, t, pdf(d_true, t), color=:red, label="True", lw=1.2, alpha=0.5)
-#xlims!(p, -2.5, 2.5)
+xlims!(p, -2.5, 2.5)
 p

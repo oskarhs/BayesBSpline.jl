@@ -130,7 +130,7 @@ function sample_posterior(rng::AbstractRNG, bsm::BSMModel{T, A, NamedTuple{(:log
         # Update δ2: (some inefficiencies here, but okay for now)
         for k in 1:K-3
             a_δ_k_new = a_δ + T(0.5)
-            b_δ_k_new = b_δ + T(0.5) * abs2( β[k+2] -  μ[k+2] - ( 2*(β[k+1] - μ[k+1]) - (β[k] - μ[k]) )) / τ2
+            b_δ_k_new = b_δ + T(0.5) * abs2( β[k+2,m-1] -  μ[k+2] - ( 2*(β[k+1,m-1] - μ[k+1]) - (β[k,m-1] - μ[k]) )) / τ2
             δ2[k] = rand(rng, InverseGamma(a_δ_k_new, b_δ_k_new))
             #δ2[k] = 1.0
         end
@@ -139,7 +139,7 @@ function sample_posterior(rng::AbstractRNG, bsm::BSMModel{T, A, NamedTuple{(:log
         a_τ_new = a_τ + T(0.5) * (K - 3)
         b_τ_new = b_τ
         for k in 1:K-3
-            b_τ_new += T(0.5) * abs2( β[k+2] -  μ[k+2] - ( 2*(β[k+1] - μ[k+1]) - (β[k] - μ[k]) )) / δ2[k]
+            b_τ_new += T(0.5) * abs2( β[k+2,m-1] -  μ[k+2] - ( 2*(β[k+1,m-1] - μ[k+1]) - (β[k,m-1] - μ[k]) )) / δ2[k]
         end
         τ2 = rand(rng, InverseGamma(a_τ_new, b_τ_new))
         #τ2 = 0.01
@@ -159,7 +159,7 @@ function sample_posterior(rng::AbstractRNG, bsm::BSMModel{T, A, NamedTuple{(:log
                     sumterm = sum(@. -log(cosh(T(0.5)*β[k0+1:K-1, m-1])) - T(0.5) * β[k0+1:K-1, m-1] - log(T(2)))
                     logprobs[l] = log_B[i, l] + sumterm
                 end =#
-                logprobs[l] = log_B[i,l] + log_θ[k] 
+                logprobs[l] = log_B[i,l] + log_θ[k,m-1] 
             end
             probs = BayesBSpline.softmax(logprobs)
             counts = rand(rng, Multinomial(1, probs))
@@ -170,7 +170,7 @@ function sample_posterior(rng::AbstractRNG, bsm::BSMModel{T, A, NamedTuple{(:log
         S = n .- cumsum(vcat(0, N[1:K-1]))
         for k in 1:K-1
             c_k_new = S[k]
-            d_k_new = β[k]
+            d_k_new = β[k, m-1]
             ω[k] = rand(rng, PolyaGammaHybridSampler(c_k_new, d_k_new))
         end
 
@@ -187,13 +187,15 @@ function sample_posterior(rng::AbstractRNG, bsm::BSMModel{T, A, NamedTuple{(:log
         β[:, m] = rand(rng, MvNormalCanon(canon_mean_new, inv_Σ_new))
 
         # Record θ
-        θ = max.(eps(), BayesBSpline.stickbreaking(β))
-        θ = θ / sum(θ)
-        log_θ = log.(θ)
-        
+        θ[:, m] = max.(eps(), BayesBSpline.stickbreaking(β[:, m]))
+        θ[:, m] = θ[:, m] / sum(θ[:, m])
+        log_θ[:, m] = log.(θ[:,m])
+        τ2s[m] = τ2
+        δ2s[:,m] = δ2
+
         # Compute coefficients in terms of unnormalized B-spline basis
-        spline_coefs = theta_to_coef(θ, basis)
-        samples[m] = (spline_coefs = spline_coefs, θ = θ, β = β, τ2 = τ2, δ2 = δ2)
+        spline_coefs = theta_to_coef(θ[:,m], basis)
+        samples[m] = (spline_coefs = spline_coefs, θ = θ[:,m], β = β[:,m], τ2 = τ2, δ2 = δ2)
     end
     return BSMChains(samples, basis, n_samples, n_burnin)
 end

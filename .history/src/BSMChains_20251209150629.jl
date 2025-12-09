@@ -40,7 +40,7 @@ function Distributions.mean(bsmc::BSMChains, t::Real)
     nonburn_params = bsmc.samples[bsmc.n_burnin+1:end]
     spline_coefs = Matrix{Float64}(undef, (length(bsmc.model), length(nonburn_params)))
     for i in eachindex(nonburn_params)
-        spline_coefs[:, i] = nonburn_params[i].spline_coefs
+        spline_coefs[:, i] = nonburn_params[i].coef
     end
     mean_coef = mapslices(mean, spline_coefs; dims=2)[:]
     f = Spline(bs, mean_coef)
@@ -53,7 +53,7 @@ function Distributions.mean(bsmc::BSMChains, t::AbstractVector{<:Real})
     nonburn_params = bsmc.samples[bsmc.n_burnin+1:end]
     spline_coefs = Matrix{Float64}(undef, (length(bsmc.model), length(nonburn_params)))
     for i in eachindex(nonburn_params)
-        spline_coefs[:, i] = nonburn_params[i].spline_coefs
+        spline_coefs[:, i] = nonburn_params[i].coef
     end
     mean_coef = mapslices(mean, spline_coefs; dims=2)[:]
     f = Spline(bs, mean_coef)
@@ -90,7 +90,7 @@ function Distributions.quantile(bsmc::BSMChains, t::AbstractVector{T}, q::Abstra
     #f_samp = evaluate_posterior_density(bsmc, t)
     f_samp = pdf(bsmc.model, bsmc.samples[bsmc.n_burnin+1:end], t)
     
-    # Compute quantiles for each row (t point) across spline_coefs samples
+    # Compute quantiles for each row (t point) across coef samples
     result = mapslices(x -> quantile(x, q), f_samp; dims=2)
     return result  # shape: (length(t), length(q))
 end

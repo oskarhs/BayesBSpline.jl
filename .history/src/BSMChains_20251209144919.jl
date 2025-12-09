@@ -15,7 +15,7 @@ struct BSMChains{T<:Real, M<:BSMModel, V<:AbstractVector}
     n_samples::Int
     n_burnin::Int
     function BSMChains{T}(samples::V, model::M, n_samples::Int, n_burnin::Int) where {T, M, V}
-        return new{T, M, V}(samples, model, n_samples, n_burnin) 
+        return new{T, M, V}(samples, model, n_samples, n_burnin)
     end
 end
 
@@ -29,6 +29,18 @@ Base.show(io::IO, bsm::BSMModel) = show(io, MIME("text/plain"), bsm)
 
 Base.eltype(::BSMChains{T, M, V}) where {T, M, V} = T
 
+# 
+# Base.Broadcast.broadcastable(bsmc::BSMChains) = Ref(bsmc)
+#= function Base.Broadcast.broadcasted(::typeof(pdf), h::AutomaticHistogram, x::AbstractVector)
+    vals = Vector{Float64}(undef, length(x))
+    @inbounds for i in eachindex(x)
+        vals[i] = pdf(h, x[i])
+    end
+    return vals
+end
+ =#
+#BSplineKit.basis(bsmc::B) where {B<:BSMChains} = bsmc.basis
+
 """
     Distributions.mean(bsmc::BSMChains, t::Real) -> Real
     Distributions.mean(bsmc::BSMChains, t::AbstractVector{<:Real}) -> Vector{<:Real}
@@ -40,7 +52,7 @@ function Distributions.mean(bsmc::BSMChains, t::Real)
     nonburn_params = bsmc.samples[bsmc.n_burnin+1:end]
     spline_coefs = Matrix{Float64}(undef, (length(bsmc.model), length(nonburn_params)))
     for i in eachindex(nonburn_params)
-        spline_coefs[:, i] = nonburn_params[i].spline_coefs
+        spline_coefs[:, i] = nonburn_params[i].coef
     end
     mean_coef = mapslices(mean, spline_coefs; dims=2)[:]
     f = Spline(bs, mean_coef)
@@ -53,7 +65,7 @@ function Distributions.mean(bsmc::BSMChains, t::AbstractVector{<:Real})
     nonburn_params = bsmc.samples[bsmc.n_burnin+1:end]
     spline_coefs = Matrix{Float64}(undef, (length(bsmc.model), length(nonburn_params)))
     for i in eachindex(nonburn_params)
-        spline_coefs[:, i] = nonburn_params[i].spline_coefs
+        spline_coefs[:, i] = nonburn_params[i].coef
     end
     mean_coef = mapslices(mean, spline_coefs; dims=2)[:]
     f = Spline(bs, mean_coef)
@@ -90,7 +102,7 @@ function Distributions.quantile(bsmc::BSMChains, t::AbstractVector{T}, q::Abstra
     #f_samp = evaluate_posterior_density(bsmc, t)
     f_samp = pdf(bsmc.model, bsmc.samples[bsmc.n_burnin+1:end], t)
     
-    # Compute quantiles for each row (t point) across spline_coefs samples
+    # Compute quantiles for each row (t point) across coef samples
     result = mapslices(x -> quantile(x, q), f_samp; dims=2)
     return result  # shape: (length(t), length(q))
 end
