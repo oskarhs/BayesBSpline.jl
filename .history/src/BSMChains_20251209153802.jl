@@ -72,11 +72,10 @@ end
 
 Compute the approximate posterior quantiles of f(t) for every element in the collection `t` using Monte Carlo samples.
 
-In the case where both `t` and `q` are scalars, the output is a real number.
-When `t` is a vector and `q` a scalar, this functions returns a vector of the same length as `t`.
+If a single quantile is requested, the output will have the same shape as `t`.
 If `q` is supplied as Vector, then this function returns a Matrix of dimension `(length(t), length(q))`, where each column corresponds to a given quantile.
 """
-function Distributions.quantile(bsmc::BSMChains, t, q::Real)
+function Distributions.quantile(bsmc::BSMChains, t::AbstractVector{<:Real}, q::Real)
     if !(0 ≤ q ≤ 1)
         throws(DomainError("Requested quantile level is not in [0,1]."))
     end
@@ -85,7 +84,7 @@ function Distributions.quantile(bsmc::BSMChains, t, q::Real)
     return mapslices(x -> quantile(x, q), f_samp; dims=2)[:]
 end
 
-function Distributions.quantile(bsmc::BSMChains, t, q::AbstractVector{<:Real})
+function Distributions.quantile(bsmc::BSMChains, t::AbstractVector{<:Real}, q::AbstractVector{<:Real})
     if !all(0 .≤ q .≤ 1)
         throw(DomainError("All requested quantile levels must lie in the interval [0,1]."))
     end
@@ -96,14 +95,7 @@ function Distributions.quantile(bsmc::BSMChains, t, q::AbstractVector{<:Real})
     result = mapslices(x -> quantile(x, q), f_samp; dims=2)
     return result  # shape: (length(t), length(q))
 end
-function Distributions.quantile(bsmc::BSMChains, t::Real, q::Real)
-    if !(0 ≤ q ≤ 1)
-        throws(DomainError("Requested quantile level is not in [0,1]."))
-    end
-    f_samp = pdf(bsmc.model, bsmc.samples[bsmc.n_burnin+1:end], t)
-
-    return mapslices(x -> quantile(x, q), f_samp; dims=2)[1]
-end
+Distributions.quantile(bsmc::BSMChains, t::Real, q::Real)
 
 """
     median(bsmc::BSMChains, t)

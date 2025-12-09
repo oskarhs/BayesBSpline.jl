@@ -72,8 +72,7 @@ end
 
 Compute the approximate posterior quantiles of f(t) for every element in the collection `t` using Monte Carlo samples.
 
-In the case where both `t` and `q` are scalars, the output is a real number.
-When `t` is a vector and `q` a scalar, this functions returns a vector of the same length as `t`.
+If a single quantile is requested, the output will have the same shape as `t`.
 If `q` is supplied as Vector, then this function returns a Matrix of dimension `(length(t), length(q))`, where each column corresponds to a given quantile.
 """
 function Distributions.quantile(bsmc::BSMChains, t, q::Real)
