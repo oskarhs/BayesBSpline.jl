@@ -210,7 +210,7 @@ function _pdf(bsm::BSMModel, spline_coefs::AbstractMatrix{<:Real}, t::AbstractVe
     f_samp = B_sparse * spline_coefs
     return f_samp
 end
-_pdf(bsm::BSMModel, spline_coefs::AbstractMatrix{<:Real}, t::Real) = _pdf(bsm, spline_coefs, [t])
+_pdf(bsm::BSMModel, spline_coefs::AbstractMatrix{<:Real}, t::Real) = _pdf(bsm, spline_coefs, [t])[1]
 
 # Evaluate for single sample
 function _pdf(bsm::BSMModel, spline_coefs::AbstractVector{<:Real}, t::AbstractVector{<:Real})

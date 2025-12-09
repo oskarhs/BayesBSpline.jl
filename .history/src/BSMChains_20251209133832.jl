@@ -45,7 +45,7 @@ end
     Distributions.mean(bsmc::BSMChains, t::Real) -> Real
     Distributions.mean(bsmc::BSMChains, t::AbstractVector{<:Real}) -> Vector{<:Real}
 
-Compute the approximate posterior mean of f(t) for every element in the collection `t` using Monte Carlo samples.
+Compute the approximate posterior mean of f(t) for every element in the collection `t` via Monte Carlo samples.
 """
 function Distributions.mean(bsmc::BSMChains, t::Real)
     bs = basis(bsmc.model)
@@ -112,7 +112,7 @@ Distributions.median(bsmc::BSMChains, t) = quantile(bsmc, t, 0.5)
 """
     var(bsmc::BSMChains, t)
 
-Compute the approximate posterior variance of f(t) for every element in the collection `t` using Monte Carlo samples.
+Compute the posterior variance of f(t) for every element in the collection `t`.
 """
 function Distributions.var(bsmc::BSMChains, t::AbstractVector{<:Real})
     f_samp = pdf(bsmc.model, bsmc.samples[bsmc.n_burnin+1:end], t)
@@ -130,6 +130,6 @@ end
 """
     std(bsmc::BSMChains, t)
 
-Compute the approximate posterior standard deviation of f(t) for every element in the collection `t` using Monte Carlo samples.
+Compute the posterior standard deviation of f(t) for every element in the collection `t`.
 """
 Distributions.std(bsmc::BSMChains, t) = sqrt(var(bsmc, t))

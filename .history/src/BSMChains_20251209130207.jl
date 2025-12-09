@@ -19,8 +19,8 @@ struct BSMChains{T<:Real, M<:BSMModel, V<:AbstractVector{<:NamedTuple}}
     end
 end
 
-function Base.show(io::IO, ::MIME"text/plain", bsmc::BSMChains{T, M, V}) where {T, M, V}
-    println(io, "BSMChains{", T, "} object holding ", bsmc.n_samples, " posterior samples, of which ", bsmc.n_burnin, " are burn-in samples.")
+function Base.show(io::IO, ::MIME"text/plain", bsmc::BSMChains)
+    println(io, "BSMChains object holding ", bsmc.n_samples, " posterior samples, including ", bsmc.n_burnin, " burn-in samples.")
     println(io, bsmc.model)
     nothing
 end
@@ -45,7 +45,7 @@ end
     Distributions.mean(bsmc::BSMChains, t::Real) -> Real
     Distributions.mean(bsmc::BSMChains, t::AbstractVector{<:Real}) -> Vector{<:Real}
 
-Compute the approximate posterior mean of f(t) for every element in the collection `t` using Monte Carlo samples.
+Compute the approximate posterior mean of f(t) via Monte Carlo samples.
 """
 function Distributions.mean(bsmc::BSMChains, t::Real)
     bs = basis(bsmc.model)
@@ -58,8 +58,17 @@ function Distributions.mean(bsmc::BSMChains, t::Real)
     f = Spline(bs, mean_coef)
     return f(t)
 end
-Base.Broadcast.broadcasted(::typeof(mean), bsmc::BSMChains, t::AbstractVector{<:Real}) = Distributions.mean(bsmc, t)
-
+function Base.Broadcast.broadcasted(::typeof(mean), bsmc::BSMChains, t::AbstractVector{<:Real}) # Specialized broadcasting routine so that we don't recompute the mean of the coefficients.
+    bs = basis(bsmc.model)
+    nonburn_params = bsmc.samples[bsmc.n_burnin+1:end]
+    spline_coefs = Matrix{Float64}(undef, (length(bsmc.model), length(nonburn_params)))
+    for i in eachindex(nonburn_params)
+        spline_coefs[:, i] = nonburn_params[i].coef
+    end
+    mean_coef = mapslices(mean, spline_coefs; dims=2)[:]
+    f = Spline(bs, mean_coef)
+    return f.(t)
+end
 function Distributions.mean(bsmc::BSMChains, t::AbstractVector{<:Real})
     bs = basis(bsmc.model)
     nonburn_params = bsmc.samples[bsmc.n_burnin+1:end]
@@ -82,7 +91,7 @@ end
         bsmc::BSMChains, t::AbstractVector{<:Real}, q::AbstractVector{<:Real}
     ) -> Matrix{<:Real}
 
-Compute the approximate posterior quantiles of f(t) for every element in the collection `t` using Monte Carlo samples.
+Compute the posterior quantiles of f(t) on the grid of `t` via Monte Carlo samples.
 
 The latter function returns a Matrix of dimension `(length(t), length(q))`, where each column corresponds to a given quantile.
 """
@@ -112,7 +121,7 @@ Distributions.median(bsmc::BSMChains, t) = quantile(bsmc, t, 0.5)
 """
     var(bsmc::BSMChains, t)
 
-Compute the approximate posterior variance of f(t) for every element in the collection `t` using Monte Carlo samples.
+Compute the posterior variance of f(t) for every element in the collection `t`.
 """
 function Distributions.var(bsmc::BSMChains, t::AbstractVector{<:Real})
     f_samp = pdf(bsmc.model, bsmc.samples[bsmc.n_burnin+1:end], t)
@@ -130,6 +139,6 @@ end
 """
     std(bsmc::BSMChains, t)
 
-Compute the approximate posterior standard deviation of f(t) for every element in the collection `t` using Monte Carlo samples.
+Compute the posterior standard deviation of f(t) for every element in the collection `t`.
 """
 Distributions.std(bsmc::BSMChains, t) = sqrt(var(bsmc, t))

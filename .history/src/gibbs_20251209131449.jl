@@ -37,7 +37,8 @@ function sample_posterior(rng::AbstractRNG, bsm::BSMModel{T, A, NamedTuple{(:log
         for k in 1:K-3
             a_δ_k_new = a_δ + T(0.5)
             b_δ_k_new = b_δ + T(0.5) * abs2( β[k+2,m-1] -  μ[k+2] - ( 2*(β[k+1,m-1] - μ[k+1]) - (β[k,m-1] - μ[k]) )) / τ2
-            δ2[k] = rand(rng, InverseGamma(a_δ_k_new, b_δ_k_new))
+            #δ2[k] = rand(rng, InverseGamma(a_δ_k_new, b_δ_k_new))
+            δ2[k] = one(T)
         end
 
         # Update τ2

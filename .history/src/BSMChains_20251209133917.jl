@@ -45,7 +45,7 @@ end
     Distributions.mean(bsmc::BSMChains, t::Real) -> Real
     Distributions.mean(bsmc::BSMChains, t::AbstractVector{<:Real}) -> Vector{<:Real}
 
-Compute the approximate posterior mean of f(t) for every element in the collection `t` using Monte Carlo samples.
+Compute the approximate posterior mean of f(t) for every element in the collection `t` via Monte Carlo samples.
 """
 function Distributions.mean(bsmc::BSMChains, t::Real)
     bs = basis(bsmc.model)

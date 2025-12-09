@@ -28,7 +28,7 @@ function sample_posterior(rng::AbstractRNG, bsm::BSMModel{T, A, NamedTuple{(:log
 
     # Initialize vector of samples
     samples = Vector{NamedTuple{(:coef, :θ, :β, :τ2, :δ2), Tuple{Vector{T}, Vector{T}, Vector{T}, T, Vector{T}}}}(undef, n_samples)
-    coef = theta_to_coef(θ[:,1], basis)
+    coef = theta_to_coef(θ, basis)
     samples[1] = (coef = coef, θ = vec(θ[:,1]), β = vec(β[:,1]), τ2 = τ2, δ2 = δ2)
 
     for m in 2:n_samples
@@ -99,10 +99,10 @@ function sample_posterior(rng::AbstractRNG, bsm::BSMModel{T, A, NamedTuple{(:log
         δ2s[:,m] = δ2
 
         # Compute coefficients in terms of unnormalized B-spline basis
-        coef = theta_to_coef(θ[:,m], basis)
+        coef = theta_to_coef(θ, basis)
         samples[m] = (coef = coef, θ = vec(θ[:,m]), β = vec(β[:,m]), τ2 = τ2, δ2 = δ2)
     end
-    return BSMChains{T}(samples, bsm, n_samples, n_burnin)
+    return BSMChains(samples, basis, n_samples, n_burnin)
 end
 
 
@@ -134,8 +134,8 @@ function sample_posterior(rng::AbstractRNG, bsm::BSMModel{T, A, NamedTuple{(:log
 
     # Initialize vector of samples
     samples = Vector{NamedTuple{(:coef, :θ, :β, :τ2, :δ2), Tuple{Vector{T}, Vector{T}, Vector{T}, T, Vector{T}}}}(undef, n_samples)
-    coef = theta_to_coef(θ[:,1], basis)
-    samples[1] = (coef = coef, θ = θ[:,1], β = β[:,1], τ2 = τ2, δ2 = δ2)
+    coef = theta_to_coef(θ, basis)
+    samples[1] = (:coef = coef, :θ = θ[:,1], :β = β[:,1], :τ2 = τ2, :δ2 = δ2)
 
     for m in 2:n_samples
 
@@ -206,7 +206,7 @@ function sample_posterior(rng::AbstractRNG, bsm::BSMModel{T, A, NamedTuple{(:log
         δ2s[:,m] = δ2
 
         # Compute coefficients in terms of unnormalized B-spline basis
-        coef = theta_to_coef(θ[:,m], basis)
+        coef = theta_to_coef(θ, basis)
         samples[m] = (coef = coef, θ = θ[:,m], β = β[:,m], τ2 = τ2, δ2 = δ2)
     end
     return BSMChains(samples, basis, n_samples, n_burnin)

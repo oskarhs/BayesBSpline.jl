@@ -6,7 +6,7 @@ function sample_posterior(rng::AbstractRNG, bsm::BSMModel{T, A, NamedTuple{(:log
     n_bins = length(bincounts)
 
     # Prior Hyperparameters
-    a_τ, b_τ, a_δ, b_δ = hyperparams(bsm)
+    a_τ, b_τ, a_δ, b_δ = params(bsm)
     
     # Store draws
     β = Matrix{T}(undef, (K-1, n_samples))
@@ -25,11 +25,6 @@ function sample_posterior(rng::AbstractRNG, bsm::BSMModel{T, A, NamedTuple{(:log
     τ2s = Vector{T}(undef, n_samples)
     τ2s[1] = τ2
     δ2s = Matrix{T}(undef, (K-3, n_samples))
-
-    # Initialize vector of samples
-    samples = Vector{NamedTuple{(:coef, :θ, :β, :τ2, :δ2), Tuple{Vector{T}, Vector{T}, Vector{T}, T, Vector{T}}}}(undef, n_samples)
-    coef = theta_to_coef(θ[:,1], basis)
-    samples[1] = (coef = coef, θ = vec(θ[:,1]), β = vec(β[:,1]), τ2 = τ2, δ2 = δ2)
 
     for m in 2:n_samples
 
@@ -97,12 +92,10 @@ function sample_posterior(rng::AbstractRNG, bsm::BSMModel{T, A, NamedTuple{(:log
         log_θ[:, m] = log.(θ[:,m])
         τ2s[m] = τ2
         δ2s[:,m] = δ2
-
-        # Compute coefficients in terms of unnormalized B-spline basis
-        coef = theta_to_coef(θ[:,m], basis)
-        samples[m] = (coef = coef, θ = vec(θ[:,m]), β = vec(β[:,m]), τ2 = τ2, δ2 = δ2)
     end
-    return BSMChains{T}(samples, bsm, n_samples, n_burnin)
+    coef = mapslices(θ -> theta_to_coef(θ, basis), θ; dims=1)
+    samples = (coef = coef, θ = θ, β = β, τ2 = τ2s, δ2 = δ2s)
+    return BSMChains(samples, basis, n_samples, n_burnin)
 end
 
 
@@ -131,11 +124,6 @@ function sample_posterior(rng::AbstractRNG, bsm::BSMModel{T, A, NamedTuple{(:log
     τ2s = Vector{T}(undef, n_samples)
     τ2s[1] = τ2
     δ2s = Matrix{T}(undef, (K-3, n_samples))
-
-    # Initialize vector of samples
-    samples = Vector{NamedTuple{(:coef, :θ, :β, :τ2, :δ2), Tuple{Vector{T}, Vector{T}, Vector{T}, T, Vector{T}}}}(undef, n_samples)
-    coef = theta_to_coef(θ[:,1], basis)
-    samples[1] = (coef = coef, θ = θ[:,1], β = β[:,1], τ2 = τ2, δ2 = δ2)
 
     for m in 2:n_samples
 
@@ -204,11 +192,9 @@ function sample_posterior(rng::AbstractRNG, bsm::BSMModel{T, A, NamedTuple{(:log
         log_θ[:, m] = log.(θ[:,m])
         τ2s[m] = τ2
         δ2s[:,m] = δ2
-
-        # Compute coefficients in terms of unnormalized B-spline basis
-        coef = theta_to_coef(θ[:,m], basis)
-        samples[m] = (coef = coef, θ = θ[:,m], β = β[:,m], τ2 = τ2, δ2 = δ2)
     end
+    coef = mapslices(θ -> theta_to_coef(θ, basis), θ; dims=1)
+    samples = (coef = coef, θ = θ, β = β, τ2 = τ2s, δ2 = δ2s)
     return BSMChains(samples, basis, n_samples, n_burnin)
 end
 

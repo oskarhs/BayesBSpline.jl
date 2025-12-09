@@ -186,21 +186,17 @@ end
 function _pdf(bsm::BSMModel, params::AbstractVector{NamedTuple{Names, Vals}}, t, ::Val{true}) where {Names, Vals}
     # Build coefficient matrix (coefs are given)
     # TODO allow for different types here
-    spline_coefs = Matrix{Float64}(undef, (length(bsm), length(params)))
+    spline_coefs = Matrix{T}(undef, (length(bsm), length(params)))
     for i in eachindex(params)
-        spline_coefs[:, i] = params[i].coef
+        spline_coefs[:, i] = params[i].coef[]
     end
     return _pdf(bsm, spline_coefs, t)
 end
 function _pdf(bsm::BSMModel, params::AbstractVector{NamedTuple{Names, Vals}}, t, ::Val{false}) where {Names, Vals}
-    # Build coefficient matrix (coefs not given)
-    # TODO allow for different types here
-    spline_coefs = Matrix{Float64}(undef, (length(bsm), length(params)))
-    for i in eachindex(params)
-        θ = stickbreaking(params[i].β)
-        spline_coefs[:, i] = theta_to_coef(θ, basis)
-    end
-    return _pdf(bsm, spline_coefs, t)
+    # Coefs not given, compute them from β
+    θ = stickbreaking(params.β)
+    coefs = theta_to_coef(θ, basis)
+    return _pdf(bsm, coefs, t)
 end
 
 # Batch evalutation (for mutiple samples, it is more efficient to reuse computation of spline basis terms)
@@ -210,7 +206,7 @@ function _pdf(bsm::BSMModel, spline_coefs::AbstractMatrix{<:Real}, t::AbstractVe
     f_samp = B_sparse * spline_coefs
     return f_samp
 end
-_pdf(bsm::BSMModel, spline_coefs::AbstractMatrix{<:Real}, t::Real) = _pdf(bsm, spline_coefs, [t])
+_pdf(bsm::BSMModel, spline_coefs::AbstractMatrix{<:Real}, t::Real) = _pdf(bsm, spline_coefs, [t])[1]
 
 # Evaluate for single sample
 function _pdf(bsm::BSMModel, spline_coefs::AbstractVector{<:Real}, t::AbstractVector{<:Real})

@@ -158,59 +158,32 @@ Base.show(io::IO, bsm::BSMModel) = show(io, MIME("text/plain"), bsm)
 
 """
     pdf(bsm::BSMModel, params::NamedTuple, t)
-    pdf(bsm::BSMModel, params::AbstractVector{NamedTuple}, t)
-
-Evaluate f(t | η) when the model parameters are equal to η.
-
-The named tuple should contain a field named `:spline_coefs` or `:β`.
 """
 function Distributions.pdf(bsm::BSMModel, params::NamedTuple{Names, Vals}, t) where {Names, Vals}
-    _pdf(bsm, params, t, Val(:coef in Names))
-end
-function Distributions.pdf(bsm::BSMModel, params::AbstractVector{NamedTuple{Names, Vals}}, t) where {Names, Vals}
     _pdf(bsm, params, t, Val(:coef in Names))
 end
 
 # Compile-time dispatch
 function _pdf(bsm::BSMModel, params::NamedTuple{Names, Vals}, t, ::Val{true}) where {Names, Vals}
     # Coefs given, no need to compute them
-    spline_coefs = params.coef
-    return _pdf(bsm, spline_coefs, t)
+    coefs = params.coef
+    return _pdf(bsm, coefs, t)
 end
 function _pdf(bsm::BSMModel, params::NamedTuple{Names, Vals}, t, ::Val{false}) where {Names, Vals}
     # Coefs not given, compute them from β
     θ = stickbreaking(params.β)
-    spline_coefs = theta_to_coef(θ, basis)
-    return _pdf(bsm, spline_coefs, t)
-end
-function _pdf(bsm::BSMModel, params::AbstractVector{NamedTuple{Names, Vals}}, t, ::Val{true}) where {Names, Vals}
-    # Build coefficient matrix (coefs are given)
-    # TODO allow for different types here
-    spline_coefs = Matrix{Float64}(undef, (length(bsm), length(params)))
-    for i in eachindex(params)
-        spline_coefs[:, i] = params[i].coef
-    end
-    return _pdf(bsm, spline_coefs, t)
-end
-function _pdf(bsm::BSMModel, params::AbstractVector{NamedTuple{Names, Vals}}, t, ::Val{false}) where {Names, Vals}
-    # Build coefficient matrix (coefs not given)
-    # TODO allow for different types here
-    spline_coefs = Matrix{Float64}(undef, (length(bsm), length(params)))
-    for i in eachindex(params)
-        θ = stickbreaking(params[i].β)
-        spline_coefs[:, i] = theta_to_coef(θ, basis)
-    end
-    return _pdf(bsm, spline_coefs, t)
+    coefs = theta_to_coef(θ, basis)
+    return _pdf(bsm, coefs, t)
 end
 
-# Batch evalutation (for mutiple samples, it is more efficient to reuse computation of spline basis terms)
+# Batch evalutation
 function _pdf(bsm::BSMModel, spline_coefs::AbstractMatrix{<:Real}, t::AbstractVector{<:Real})
     bs = basis(bsm)
     B_sparse = create_unnormalized_sparse_spline_basis_matrix(t, bs)
     f_samp = B_sparse * spline_coefs
     return f_samp
 end
-_pdf(bsm::BSMModel, spline_coefs::AbstractMatrix{<:Real}, t::Real) = _pdf(bsm, spline_coefs, [t])
+_pdf(bsm::BSMModel, spline_coefs::AbstractMatrix{<:Real}, t::Real) = _pdf(bsm, spline_coefs, [t])[1]
 
 # Evaluate for single sample
 function _pdf(bsm::BSMModel, spline_coefs::AbstractVector{<:Real}, t::AbstractVector{<:Real})

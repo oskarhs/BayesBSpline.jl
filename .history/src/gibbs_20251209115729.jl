@@ -102,7 +102,7 @@ function sample_posterior(rng::AbstractRNG, bsm::BSMModel{T, A, NamedTuple{(:log
         coef = theta_to_coef(θ[:,m], basis)
         samples[m] = (coef = coef, θ = vec(θ[:,m]), β = vec(β[:,m]), τ2 = τ2, δ2 = δ2)
     end
-    return BSMChains{T}(samples, bsm, n_samples, n_burnin)
+    return BSMChains(samples, bsm, n_samples, n_burnin)
 end
 
 
